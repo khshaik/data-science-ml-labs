@@ -1,0 +1,101 @@
+Take Home Assignment: From Data to Decision- Interpreting Neural Network Outputs
+, Assignment ,  Required
+Due on 12 April 2026 11:59 PM
+15 Mar - 12 Apr
+Not Submitted
+Go to: Submission
+
+Instructions
+--------------
+1. Objective 
+--------------
+This assignment evaluates your ability to apply neural network models to a real-world dataset and move beyond prediction to interpretation and decision-making. The focus is on.
+	Understanding data and problem context
+	Applying a simple neural network appropriately
+	Interpreting model results critically
+	Translating insights into clear, actionable decisions
+	Model complexity is not the objective; reasoning and clarity are.
+
+2. Task Description
+--------------------
+	You are provided with a real-world dataset related to customer behaviour from a telecommunications service provider. Each row represents an individual customer and the goal is to analyse customer behaviour and predict whether the customer is likely to churn (i.e., discontinue the service). File name:- telco_churn.csv
+
+	Refer to file Telco_Churn_Data_Dictionary.pdf for a detailed description of the columns in the dataset.
+
+You must complete following steps:
+
+Data Understanding and Preparation
+	Describe dataset and prediction task.
+	Perform necessary data cleaning and preprocessing.
+	Justify feature selection and transformations.
+
+Exploratory Data Analysis (EDA)
+	Identify at least three meaningful insights from the data.
+	Use visualisations or summary statistics where appropriate.
+	Explain why these insights are important for the business problem.
+
+Neural Network Modelling
+	Build a simple feedforward neural network.
+	Justify: Choice of input features, Loss function, Evaluation metric(s)
+
+Evaluation and Interpretation
+	Evaluate model performance using appropriate metrics.
+	Discuss what the model captures well and where it may fail.
+
+From Insight to Decision
+	Propose two concrete, actionable decisions based on your analysis.
+	Clearly state the assumptions, risks, and limitations and conditions under which your decisions may not work.
+
+3. Deliverables
+----------------
+Submit a single ZIP folder containing.
+	Report (PDF, max 5 pages)
+		Structured according to the task sections
+		Clear visuals and explanations
+	Jupyter Notebook (.ipynb)
+		Clean, readable and well-commented
+		Must run end-to-end
+
+4. Academic Integrity
+---------------------
+You must use only the dataset provided on the LMS.
+	Do not merge or augment with external datasets.
+	Direct use of Kaggle notebooks or public solutions is prohibited.
+	Plagiarism above 10% will result in a score of 0 or disciplinary action.
+	Use of AI tools is permitted only for assistance, not for generating final analysis or conclusions.
+
+5. Tips for Success
+--------------------
+	Start with the problem, not the model.
+	Be explicit about assumptions and trade-offs.
+	Simplicity with clarity will score higher than complexity.
+	Double-check submission format and deadlines.
+
+Evaluation Criteria
+--------------------
+	Grade Item: , Out of: 20 points
+	Out of: 20 points
+	Submission Details
+	Submission type: File submission
+	Files allowed per submission: One file
+	Allowed files: No Restrictions
+	Number of submissions: Only one submission allowed
+
+--------------------------------------------------
+@BITS Asok Awesome bro! Couple of questions
+
+1. Are you getting any null or NA values in the dataset?
+2. For feature engineering part, we are covering it under "Data Understanding and Preparation". Correct?
+
+-----
+
+Kernel registered. Now in VS Code.
+
+Click the kernel selector (top-right of notebook)
+Select "Python 3.11 (ANN)" from the list
+Restart kernel and run the import cell
+The virtual environment is now ready at:
+
+Path: ./venv
+Python: 3.11
+Packages: pandas, numpy, matplotlib, seaborn, scikit-learn, ipykernel
