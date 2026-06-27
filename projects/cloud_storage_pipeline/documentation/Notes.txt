@@ -1,0 +1,222 @@
+Graded Assignment
+------------------
+    Course: MSc in Data Science and AI:  Cloud and DevOps Foundations
+    Assignment Title: Building a Serverless Data Processing Pipeline on AWS
+    Weightage: 20% of the total program Grade
+    Deadline: 12th April 2026
+    Submission Mode: LMS Upload
+    Submission Format: Single PDF document
+ 
+1. Objective
+-------------
+    The objective of this assignment is to assess the learner’s ability to design, deploy and validate a simple cloud-native data processing pipeline using AWS services. Learners will demonstrate.
+        ●	Understanding of IAM and least-privilege access
+        ●	Ability to integrate multiple AWS services
+        ●	Practical exposure to event-driven serverless architecture
+        ●	Ability to observe, validate and reason about system outputs
+    
+    This assignment focuses on cloud integration and reasoning.
+ 
+2. Task Description
+--------------------
+    You are required to build a serverless data ingestion and processing pipeline on AWS. Whenever a dataset is uploaded to cloud storage.
+        1.	The data is automatically processed
+        2.	Basic file-level metrics are generated
+        3.	Processing results are logged
+        4.	Metadata is stored in a database
+
+    The solution must be secure by design, cost-effective and observable.
+
+Architecture Overview
+----------------------
+    Your solution must use the following AWS services.
+        ●	Amazon S3: Raw data ingestion
+        ●	AWS Lambda: Serverless processing
+        ●	Amazon DynamoDB: Metadata storage
+        ●	Amazon CloudWatch: Log observation
+        ●	AWS IAM: Secure access management
+
+High-Level Flow
+    User Upload → S3 Bucket
+                → Lambda Trigger
+                → CloudWatch Logs
+                → DynamoDB Entry
+
+Assignment Tasks
+------------------
+Part A: IAM Setup 
+-------
+        Create an IAM user named Assignment
+            ●	Enable console access for the user and attach only required permissions
+            ●	Log out of root and complete assignment only using Assignment user
+        Screenshots Required:
+            ●	IAM user details
+            ●	Permissions attached to the Assignment user (policy view)
+
+Part B: Architecture Design
+-------
+        Create a simple architecture diagram using https://www.drawio.com/ or Microsoft Word, that showcases the flow of the entire assignment. 
+        [Uploading a file in S3 🡪 Populating items in DynamoDB]
+        Provide a brief explanation describing:
+            ●	How services interact
+            ●	How security is enforced
+            ●	Why is event-driven design used
+
+Part C: AWS Resource Setup
+-------
+        1. Amazon S3
+            ●	Create an S3 bucket and upload one or more dataset files (CSV format)
+            Screenshot Required:
+                ●	S3 bucket with uploaded object(s)
+        2. AWS Lambda
+            ●	Create a Lambda function (Python runtime) and configure it to trigger on S3 object upload.
+            ●	Use the provided baseline script (do not rewrite from scratch)
+            Screenshots Required
+                ●	S3 added as a trigger
+
+Baseline Lambda Script
+-----------------------
+import json
+import boto3
+import datetime
+import csv
+import io
+import os
+
+s3_client = boto3.client('s3')
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('FileProcessingMetadata')
+
+def lambda_handler(event, context):
+    record = event['Records'][0]
+    bucket_name = record['s3']['bucket']['name']
+    file_key = record['s3']['object']['key']
+    file_size = record['s3']['object']['size']
+
+    file_extension = os.path.splitext(file_key)[1].lower()
+    timestamp = datetime.datetime.utcnow().isoformat()
+
+    rows = None
+    columns = None
+
+    if file_extension != '.csv':
+        print(f"Unsupported file type: {file_extension}")
+        return {"statusCode": 400, "body": "Only CSV files are supported"}
+
+    # Download CSV from S3
+    response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+    content = response['Body'].read().decode('utf-8')
+    csv_reader = csv.reader(io.StringIO(content))
+
+    data = list(csv_reader)
+    rows = len(data) - 1 if len(data) > 1 else 0
+    columns = len(data[0]) if data else 0
+
+    log_message = {
+        "file_name": file_key,
+        "file_type": file_extension,
+        "file_size_bytes": file_size,
+        "rows": rows,
+        "columns": columns,
+        "processed_at": timestamp
+    }
+
+    print("Processed File Metrics:", json.dumps(log_message))
+
+    # Insert record into DynamoDB
+    table.put_item(
+        Item={
+            "file_name": file_key,
+            "processed_at": timestamp,
+            "file_type": file_extension,
+            "file_size_bytes": file_size,
+            "rows": rows,
+            "columns": columns
+        }
+    )
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(log_message)
+    }
+
+3. Amazon DynamoDB
+-------------------
+    ●	Create a DynamoDB table named FileProcessingMetadata
+    ●	Partition key: file_name (String)
+    ●	The table should initially contain no items
+        Screenshot Required
+            ●	DynamoDB table item populated after file upload(s)
+
+Part D: Output Validation
+-------
+    Provide:
+        ●	CloudWatch log output showing metrics
+        ●	DynamoDB table entries for each upload
+ 
+3. Deliverables
+----------------
+    Submit one PDF containing:
+        1.	Architecture diagram and brief explanation
+        2.	Screenshots of: IAM non-root user and its permissions, S3 configured as a trigger to Lambda, Lambda logs with processing metrics and DynamoDB table entries.
+    
+    Maximum Length: 5 pages
+ 
+4. Evaluation Criteria (Rubric)
+--------------------------------
+
+Component                 | Description                                      | Weight
+--------------------------|--------------------------------------------------|--------
+IAM and Security          | Least-privilege user creation and justification  | 20%
+Analysis and Reasoning    | Architectural explanation and trade-offs         | 25%
+Technical Accuracy        | Correct triggers, logs and DB entries            | 25%
+Structure and Clarity     | Well-organised submission and screenshots        | 15%
+Reflection and Insight    | Learning depth and reasoning                     | 15%
+
+5. Academic Integrity
+----------------------
+    ●	Plagiarism above 10% will result in a score of 0 or disciplinary action.
+    ●	Collaboration is not permitted unless explicitly mentioned.
+
+6. Tips for Success 
+--------------------
+    ●	Reference all related practical labs. 
+    ●	Double-check submission format and deadlines.
+
+                                ----------------------
+
+Console sign-in details
+    Email sign-in instructions
+    Console sign-in URL: https://338183195533.signin.aws.amazon.com/console
+    User name: Assignment
+    User group: AssignmentGroup
+    Console password: Aariz@160416
+
+S3 Bucket: assignment-csv-processing-2025em1100102
+Lambda: file-processing-lambda--2025em1100102
+CloudWatch: Log group| /aws/lambda/file-processing-lambda--2025em1100102
+DynamoDB: FileProcessingMetadata
+
+Step 3 — Then Cleanup 🧹
+
+After submission:
+
+👉 Delete in this order:
+
+1. Lambda
+
+Delete function
+
+2. S3
+
+Delete objects
+
+Then delete bucket
+
+3. DynamoDB
+
+Delete table
+
+4. CloudWatch
+
+(Optional — logs auto-expire)
