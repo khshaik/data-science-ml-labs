@@ -1,0 +1,38 @@
+1. UCI Heart Disease Dataset: Data link https://www.kaggle.com/datasets/redwankarimsony/heart-disease-data
+---------------------------------------------------------------------------------------------------------------
+id | age | sex  | dataset   | cp               | trestbps | chol | fbs  | restecg        | thalch | exang | oldpeak | slope        | ca | thal         | num
+---------------------------------------------------------------------------------------------------------------
+1  | 63  | Male | Cleveland | typical angina   | 145      | 233  | TRUE | lv hypertrophy | 150    | FALSE | 2.3     | downsloping  | 0  | fixed defect | 0
+---------------------------------------------------------------------------------------------------------------
+
+2. UCI Bank Marketing Dataset: Data link https://www.kaggle.com/datasets/adityamhaske/bank-marketing-dataset
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+age | job        | marital | education | default | balance | housing | loan | contact | day | month | duration | campaign | pdays | previous | poutcome | y
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+58  | management | married | tertiary  | no      | 2143    | yes     | no   | unknown | 5   | may   | 261      | 1        | -1    | 0        | unknown  | no
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+3. Titanic Dataset: Data link https://www.kaggle.com/datasets/yasserh/titanic-dataset
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+PassengerId | Survived | Pclass | Name                        | Sex  | Age | SibSp | Parch | Ticket     | Fare | Cabin | Embarked
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1           | 0        | 3      | Braund, Mr. Owen Harris     | male | 22  | 1     | 0     | A/5 21171  | 7.25 |       | S
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4. UCI Breast Cancer Wisconsin Dataset: Data link https://www.kaggle.com/datasets/uciml/breast-cancer-wisconsin-data
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+id     | diagnosis | radius_mean | texture_mean | perimeter_mean | area_mean | smoothness_mean | compactness_mean | concavity_mean | concave points_mean | symmetry_mean | fractal_dimension_mean | radius_se | texture_se | perimeter_se | area_se | smoothness_se | compactness_se | concavity_se | concave points_se | symmetry_se | fractal_dimension_se | radius_worst | texture_worst | perimeter_worst | area_worst | smoothness_worst | compactness_worst | concavity_worst | concave points_worst | symmetry_worst | fractal_dimension_worst
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+842517 | M         | 20.57       | 17.77        | 132.9          | 1326      | 0.08474         | 0.07864          | 0.0869         | 0.07017              | 0.1812        | 0.05667                | 0.5435    | 0.7339     | 3.398        | 74.08   | 0.005225      | 0.01308        | 0.0186        | 0.0134             | 0.01389     | 0.003532             | 24.99        | 23.41         | 158.8           | 1956      | 0.1238           | 0.1866            | 0.2416          | 0.186                  | 0.275          | 0.08902
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+https://github.com/Rawanmalharbi/UCI-Bank-Marketing/blob/main/projectSdaiaBC-BnakData-RAGHAD-RAWAN.ipynb
+https://github.com/alexkataev/Case-Study-UCI-Bank-Marketing-Dataset/blob/main/Part-1-EDA/Case%20Study%20-%20UCI%20Bank%20Marketing%20Dataset%20-%20Part%201%20(EDA).ipynb
+https://github.com/yashada-nikam/UCI-Bank-Marketing-Analysis/blob/main/Bank%20Marketing%20Analysis.ipynb
+https://github.com/YingluDeng/UCI_Bank_Marketing_ML/blob/main/Bank_Marketing_Project.ipynb
+https://github.com/aajinr/bank_marketing/blob/main/notebooks/302_model_training.ipynb
+https://github.com/ktamburi/Bank-Marketing-UCI-Dataset-Neural-Network/blob/main/NN_Klaudia_Tamburi.ipynb
+https://github.com/jovitaand/UCI-Bank-Marketing-Dataset/blob/main/UCI_Bank_Marketing_Dataset.ipynb
+https://github.com/ayan-cs/bank-marketing-uciml/blob/main/bank_marketing.ipynb
+https://alexkataev.medium.com/uci-bank-marketing-dataset-part-1-exploratory-data-analysis-eda-f3108f3982b4
