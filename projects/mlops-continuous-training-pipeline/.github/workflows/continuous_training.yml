@@ -1,0 +1,400 @@
+name: Iris — Continuous Training Pipeline
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggers:
+#   push to main   → run monitoring + trigger check (retrain if needed)
+#   schedule       → weekly safety-net retrain on Sunday midnight UTC
+#   manual         → workflow_dispatch lets you force a full pipeline run
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.py"
+      - "config.yaml"
+      - "requirements.txt"
+
+  schedule:
+    - cron: "0 0 * * 0"    # Every Sunday at 00:00 UTC (time-based safety net)
+
+  workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: "Force retraining regardless of triggers"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+      dry_run:
+        description: "Dry run — evaluate but do NOT promote"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 1 — Lint & unit tests (runs on every push, fast gate)
+  # ───────────────────────────────────────────────────────────────────────────
+  lint-and-test:
+    name: "Lint & Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt flake8 pytest
+
+      - name: Lint (flake8)
+        run: |
+          flake8 . --max-line-length=100 \
+                   --exclude=.git,__pycache__ \
+                   --per-file-ignores="__init__.py:F401"
+
+      - name: Unit tests
+        run: pytest tests/ -v --tb=short
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 2 — Generate datasets (only if data files are missing or changed)
+  # ───────────────────────────────────────────────────────────────────────────
+  generate-data:
+    name: "Generate Datasets"
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    outputs:
+      data_hash: ${{ steps.hash.outputs.hash }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate all datasets
+        run: python data_generator.py
+
+      - name: Hash data files (for cache key)
+        id: hash
+        run: |
+          if [ -f data/*.csv ]; then
+            hash=$(md5sum data/*.csv 2>/dev/null | md5sum | cut -d' ' -f1)
+          else
+            hash="$(date +%s)"
+          fi
+          [ -z "$hash" ] && hash="fallback-$(date +%s)"
+          echo "hash=$hash" >> $GITHUB_OUTPUT
+          echo "Artifact hash: $hash"
+
+      - name: Upload datasets as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: datasets-${{ github.run_id }}
+          path: data/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 3 — Monitoring (always runs; determines whether to proceed)
+  # ───────────────────────────────────────────────────────────────────────────
+  monitor:
+    name: "Monitor — Drift & Performance"
+    runs-on: ubuntu-latest
+    needs: generate-data
+    outputs:
+      should_retrain: ${{ steps.check.outputs.should_retrain }}
+      trigger_reasons: ${{ steps.check.outputs.trigger_reasons }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download datasets
+        uses: actions/download-artifact@v4
+        with:
+          name: datasets-${{ github.run_id }}
+          path: data/
+          if-no-files-found: warn
+
+      - name: Ensure datasets exist
+        run: |
+          if [ ! -f data/reference.csv ] || [ ! -f data/production.csv ]; then
+            echo "Dataset artifact missing or incomplete; regenerating data..."
+            python data_generator.py
+          fi
+
+      - name: Restore current model (if cached)
+        uses: actions/cache@v4
+        with:
+          path: models/current_model.pkl
+          key: current-model-${{ github.ref }}
+          restore-keys: current-model-
+
+      - name: Run monitoring cycle
+        run: python monitor.py
+
+      - name: Run trigger evaluation
+        id: check
+        run: |
+          python -c "
+          import json, sys
+          from retrain_trigger import run_trigger_evaluation
+          result = run_trigger_evaluation(dry_run=True)
+          force  = '${{ github.event.inputs.force_retrain }}' == 'true'
+          retrain = result['retrain'] or force
+          reasons = ','.join(result['triggered_by'])
+          print(f'should_retrain={str(retrain).lower()}')
+          print(f'trigger_reasons={reasons}')
+          with open('$GITHUB_OUTPUT', 'a') as f:
+              f.write(f'should_retrain={str(retrain).lower()}\n')
+              f.write(f'trigger_reasons={reasons}\n')
+          "
+
+      - name: Upload monitoring logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 14
+
+      - name: Upload drift report
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report-${{ github.run_id }}
+          path: reports/drift_report.html
+          retention-days: 14
+        if: always()
+
+      - name: Comment trigger decision on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const retrain = '${{ steps.check.outputs.should_retrain }}';
+            const reasons = '${{ steps.check.outputs.trigger_reasons }}' || 'none';
+            const icon    = retrain === 'true' ? '🚨' : '✅';
+            const body    = `## ${icon} Continuous Training Trigger Check\n` +
+                            `**Should retrain:** \`${retrain}\`\n` +
+                            `**Reasons:** ${reasons}\n\n` +
+                            `[View drift report](../actions/runs/${{ github.run_id }})`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 4 — Retrain (only runs when monitoring says so, or forced)
+  # ───────────────────────────────────────────────────────────────────────────
+  retrain:
+    name: "Retrain Model"
+    runs-on: ubuntu-latest
+    needs: monitor
+    if: |
+      needs.monitor.outputs.should_retrain == 'true' ||
+      github.event.inputs.force_retrain == 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download datasets
+        uses: actions/download-artifact@v4
+        with:
+          name: datasets-${{ github.run_id }}
+          path: data/
+          if-no-files-found: warn
+
+      - name: Ensure datasets exist
+        run: |
+          if [ ! -f data/reference.csv ] || [ ! -f data/production.csv ]; then
+            echo "Dataset artifact missing or incomplete; regenerating data..."
+            python data_generator.py
+          fi
+
+      - name: Retrain on reference + production data
+        run: python train.py --combine
+
+      - name: Upload candidate model
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-model-${{ github.run_id }}
+          path: models/candidate_model.pkl
+          retention-days: 30
+
+      - name: Upload training logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-logs-${{ github.run_id }}
+          path: logs/metrics_history.json
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 5 — Evaluate (all 5 gates must pass before promotion)
+  # ───────────────────────────────────────────────────────────────────────────
+  evaluate:
+    name: "Evaluate — All Gates"
+    runs-on: ubuntu-latest
+    needs: [generate-data, retrain]
+    outputs:
+      all_passed: ${{ steps.eval.outputs.all_passed }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download datasets
+        uses: actions/download-artifact@v4
+        with:
+          name: datasets-${{ github.run_id }}
+          path: data/
+          if-no-files-found: warn
+
+      - name: Ensure datasets exist
+        run: |
+          if [ ! -f data/reference.csv ] || [ ! -f data/production.csv ]; then
+            echo "Dataset artifact missing or incomplete; regenerating data..."
+            python data_generator.py
+          fi
+
+      - name: Download candidate model
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-model-${{ github.run_id }}
+          path: models/
+
+      - name: Run all evaluation gates
+        id: eval
+        run: |
+          python -c "
+          from evaluate import run_evaluation
+          result = run_evaluation(auto_promote=False)
+          passed = str(result['all_passed']).lower()
+          with open('$GITHUB_OUTPUT', 'a') as f:
+              f.write(f'all_passed={passed}\n')
+          import sys
+          sys.exit(0 if result['all_passed'] else 1)
+          "
+
+      - name: Upload evaluation logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-logs-${{ github.run_id }}
+          path: logs/evaluation_history.json
+          retention-days: 30
+        if: always()
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Job 6 — Promote (only if all gates passed AND not dry-run)
+  # ───────────────────────────────────────────────────────────────────────────
+  promote:
+    name: "Promote to Production"
+    runs-on: ubuntu-latest
+    needs: evaluate
+    if: |
+      needs.evaluate.outputs.all_passed == 'true' &&
+      github.event.inputs.dry_run != 'true'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download candidate model
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-model-${{ github.run_id }}
+          path: models/
+
+      - name: Restore current model for archiving
+        uses: actions/cache@v4
+        with:
+          path: models/current_model.pkl
+          key: current-model-${{ github.ref }}
+
+      - name: Promote candidate → production
+        run: |
+          python -c "
+          from evaluate import promote_candidate
+          promote_candidate('models/candidate_model.pkl', 'models/current_model.pkl')
+          print('Promotion complete.')
+          "
+
+      - name: Cache new current model
+        uses: actions/cache@v4
+        with:
+          path: models/current_model.pkl
+          key: current-model-${{ github.ref }}-${{ github.run_id }}
+
+      - name: Upload promoted model as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-model-${{ github.run_id }}
+          path: models/current_model.pkl
+          retention-days: 90
+
+      - name: Create GitHub release for promoted model
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = `model-v${new Date().toISOString().slice(0,10)}-${context.runId}`;
+            const permissions = context.payload.repository?.permissions || {};
+            const canWrite = Boolean(permissions.contents || permissions.push || permissions.admin);
+            if (!canWrite) {
+              core.info(`Skipping release creation for ${tag}: token lacks repository write access.`);
+              return;
+            }
+            try {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                ref:   `refs/tags/${tag}`,
+                sha:   context.sha,
+              });
+              await github.rest.repos.createRelease({
+                owner:            context.repo.owner,
+                repo:             context.repo.repo,
+                tag_name:         tag,
+                name:             `Iris CT Model — ${tag}`,
+                body:             `Automated model promotion\nRun ID: ${context.runId}\nTriggered by: ${{ needs.monitor.outputs.trigger_reasons || 'scheduled' }}`,
+                draft:            false,
+                prerelease:       false,
+              });
+              core.info(`Created release ${tag}`);
+            } catch (error) {
+              core.warning(`Release creation skipped: ${error.message}`);
+            }

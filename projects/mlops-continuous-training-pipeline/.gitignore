@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python packaging
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+.coverage
+.coverage.*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Logs and runtime files
+logs/
+*.log
+
+# Environment variables
+.env
+.env.*
+
+# MLflow
+mlruns/
+
+# Model and artifact files
+*.pkl
+*.joblib
+*.h5
+*.onnx
+*.pt
+*.pth
+models/
+
+# Generated reports
+reports/
+
+# OS files
+.DS_Store
+Thumbs.db
