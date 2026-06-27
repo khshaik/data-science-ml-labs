@@ -1,0 +1,22 @@
+# Final Priority Order (Highest Scoring Potential → Lowest)
+## 1️⃣ P4 — ANN-Based Customer Response Prediction (**BEST CHOICE**)
+## 2️⃣ P5 — ANN-Based Product Quality Classification
+## 3️⃣ P1 — Employee Attrition Prediction & Workforce Risk Analysis
+## 4️⃣ P3 — Customer Behaviour Segmentation & Engagement Profiling
+## 5️⃣ P2 — Retail Sales Amount Prediction & Customer Spending Analysis
+---------------------
+Individual Project
+PowerBI, Tableau interpretations
+
+Model interpretability
+8 weeks duration
+2 Credit score
+9th week: Final submission for Evaluatoin
+
+3 submissions
+---------------
+1.2nd week: Expectation from student
+ Data-set selection, Problem statement, Objective, model used.
+2.5th week: Steps of Data pre-processing, Exploratory Data Analysis, Feature Engineering, Baseline model construction.
+3.8th week: Jupyter Notebook, Data dictionary
+	Model selection, construction, hyper-parameter tuning
