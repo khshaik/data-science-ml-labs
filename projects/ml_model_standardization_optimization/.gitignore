@@ -1,0 +1,12 @@
+.venv/
+Notebooks/
+
+# VS Code
+.vscode/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
