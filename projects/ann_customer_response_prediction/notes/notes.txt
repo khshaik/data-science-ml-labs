@@ -1,0 +1,6 @@
+Introduction
+	Develop an end-to-end ANN-based customer response prediction framework to predict term-deposit subscriptions using the UCI Bank Marketing Dataset, enabling targeted marketing, improved customer acquisition, reduced campaign costs, and data-driven business decisions.
+
+Problem Statement (Recommended)
+	Traditional bank marketing campaigns often rely on untargeted customer outreach, resulting in low conversion rates, inefficient resource utilization, and increased operational costs. This project develops an end-to-end ANN-based customer response prediction framework using the UCI Bank Marketing Dataset to identify customers most likely to subscribe to term deposits, enabling data-driven customer targeting, improved campaign effectiveness, and higher marketing ROI.
+
