@@ -1,0 +1,46 @@
+# Prometheus alert rules
+# Bonus Feature: Prometheus + Grafana (+0.5 mark)
+
+groups:
+  - name: churn_prediction_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(prediction_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High prediction error rate"
+          description: "Error rate is {{ $value }} errors/sec (threshold: 0.05)"
+
+      # High latency
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(prediction_latency_seconds_bucket[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High prediction latency"
+          description: "P95 latency is {{ $value }}s (threshold: 0.2s)"
+
+      # Low throughput
+      - alert: LowThroughput
+        expr: rate(predictions_total[5m]) < 1
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low prediction throughput"
+          description: "Throughput is {{ $value }} predictions/sec"
+
+      # API down
+      - alert: APIDown
+        expr: up{job="churn-prediction-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is down"
+          description: "Churn prediction API is not responding"

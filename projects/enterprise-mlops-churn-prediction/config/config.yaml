@@ -1,0 +1,101 @@
+# Global configuration for enterprise MLOps churn prediction
+project:
+  name: "enterprise-mlops-churn-prediction"
+  version: "1.0.0"
+  description: "Production ML system for telco customer churn prediction"
+
+data:
+  raw_path: "data/raw/telco_customer_churn.csv"
+  processed_path: "data/processed"
+  training_path: "data/training/training_data_v1.csv"
+  
+  # Train/Val/Test split
+  train_split: 0.6
+  val_split: 0.2
+  test_split: 0.2
+  random_seed: 42
+  
+  # Data quality thresholds
+  max_missing_rate: 0.05
+  min_row_count: 1000
+
+models:
+  baseline:
+    type: "LogisticRegression"
+    path: "models/baseline"
+    hyperparameters:
+      C: 1.0
+      max_iter: 1000
+      random_state: 42
+  
+  candidate:
+    type: "NeuralNetwork"
+    path: "models/candidate"
+    hyperparameters:
+      hidden_layers: [64, 32, 16]
+      dropout_rate: 0.3
+      learning_rate: 0.001
+      epochs: 50
+      batch_size: 32
+      early_stopping_patience: 5
+      random_state: 42
+  
+  current_best_path: "models/current_best.json"
+  
+  # Promotion guardrails
+  promotion:
+    min_auc: 0.80
+    min_recall: 0.75
+    max_degradation: 0.01
+
+serving:
+  api:
+    host: "0.0.0.0"
+    port: 8000
+    workers: 4
+    reload: false
+  
+  latency_threshold_ms: 200
+  batch_size: 32
+  
+  # Model loading
+  model_cache_ttl_seconds: 3600
+
+monitoring:
+  # Drift detection thresholds
+  drift_threshold_psi: 0.2
+  drift_threshold_ks_pvalue: 0.05
+  
+  # Data quality thresholds
+  missing_rate_threshold: 0.05
+  outlier_threshold_std: 3.0
+  
+  # Performance thresholds
+  min_auc_threshold: 0.75
+  max_latency_p95_ms: 200
+  max_error_rate: 0.01
+  
+  # Metrics collection
+  metrics_port: 9090
+  metrics_path: "/metrics"
+
+mlflow:
+  tracking_uri: "sqlite:///mlflow.db"
+  experiment_name: "churn-prediction"
+  model_registry_name: "churn-predictor"
+  artifact_location: "mlruns"
+
+retraining:
+  # Retraining triggers
+  min_new_data_count: 1000
+  max_auc_drop: 0.05
+  max_drift_score: 0.3
+  max_days_since_training: 30
+  
+  # Retraining schedule
+  schedule_cron: "0 0 * * 0"  # Weekly on Sunday at midnight
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_dir: "artifacts/logs"

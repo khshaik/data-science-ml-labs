@@ -1,0 +1,148 @@
+# Feature definitions for churn prediction
+# Ensures consistency between training (offline) and serving (online)
+
+features:
+  # Original features from dataset
+  original:
+    - customerID
+    - gender
+    - SeniorCitizen
+    - Partner
+    - Dependents
+    - tenure
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+    - MonthlyCharges
+    - TotalCharges
+  
+  # Engineered features (5+ non-trivial features required)
+  engineered:
+    - name: "avg_monthly_charge"
+      type: "aggregation"
+      formula: "TotalCharges / tenure"
+      offline: true
+      online: true
+      description: "Average monthly charge over customer lifetime"
+      importance: "high"
+      training_serving_skew_risk: "medium"
+      mitigation: "Shared calculation logic in src/features/engineering.py"
+    
+    - name: "service_adoption_score"
+      type: "aggregation"
+      formula: "count(OnlineSecurity=='Yes', OnlineBackup=='Yes', DeviceProtection=='Yes', TechSupport=='Yes', StreamingTV=='Yes', StreamingMovies=='Yes')"
+      offline: true
+      online: true
+      description: "Number of add-on services adopted by customer"
+      importance: "high"
+      training_serving_skew_risk: "low"
+      mitigation: "Simple count, consistent across environments"
+    
+    - name: "tenure_category"
+      type: "binning"
+      bins: [0, 12, 24, 48, 1000]
+      labels: ["0-12m", "13-24m", "25-48m", "48m+"]
+      offline: true
+      online: true
+      description: "Tenure bucketed into meaningful categories"
+      importance: "medium"
+      training_serving_skew_risk: "low"
+      mitigation: "Fixed bin boundaries, deterministic"
+    
+    - name: "payment_risk_flag"
+      type: "encoding"
+      formula: "1 if PaymentMethod == 'Electronic check' else 0"
+      offline: true
+      online: true
+      description: "High-risk payment method indicator (Electronic check has higher churn)"
+      importance: "medium"
+      training_serving_skew_risk: "low"
+      mitigation: "Simple boolean logic, no dependencies"
+    
+    - name: "contract_stability_score"
+      type: "ordinal_encoding"
+      mapping:
+        "Month-to-month": 1
+        "One year": 2
+        "Two year": 3
+      offline: true
+      online: true
+      description: "Contract commitment level (higher = more stable)"
+      importance: "high"
+      training_serving_skew_risk: "low"
+      mitigation: "Fixed mapping, deterministic"
+    
+    - name: "high_value_customer"
+      type: "threshold"
+      formula: "1 if MonthlyCharges > percentile_75 else 0"
+      offline: true
+      online: true
+      description: "High monthly charges indicator (top 25% of customers)"
+      importance: "medium"
+      training_serving_skew_risk: "medium"
+      mitigation: "Use training set percentile as fixed threshold"
+  
+  # Target variable
+  target: "Churn"
+  
+  # Features to drop (not predictive or identifiers)
+  drop:
+    - customerID  # Identifier, not predictive
+  
+  # Categorical features requiring encoding
+  categorical:
+    - gender
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+    - tenure_category
+  
+  # Numerical features requiring scaling
+  numerical:
+    - SeniorCitizen
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+    - avg_monthly_charge
+    - service_adoption_score
+    - contract_stability_score
+
+# Feature importance (from EDA in original notebook)
+feature_importance_ranking:
+  1: "Contract"
+  2: "tenure"
+  3: "MonthlyCharges"
+  4: "TotalCharges"
+  5: "InternetService"
+  6: "PaymentMethod"
+  7: "OnlineSecurity"
+  8: "TechSupport"
+  9: "avg_monthly_charge"
+  10: "service_adoption_score"
+
+# Training-serving skew prevention strategy
+skew_prevention:
+  strategy: "shared_feature_engineering_module"
+  module_path: "src/features/engineering.py"
+  validation: "Unit tests to verify offline == online"
+  monitoring: "Track feature distributions in production vs training"
