@@ -82,7 +82,7 @@ def test_predict_endpoint_success(mock_feature_engineer, mock_preprocessor, mock
     mock_preprocessor.feature_names = ['feature1', 'feature2']
     
     # Mock model prediction
-    mock_model.predict.return_value = np.array([[0.75]])
+    mock_model.predict_proba.return_value = np.array([[0.25, 0.75]])
     
     response = client.post("/predict", json=sample_request)
     

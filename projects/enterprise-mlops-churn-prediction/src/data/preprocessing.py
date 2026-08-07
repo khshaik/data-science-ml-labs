@@ -214,6 +214,36 @@ class DataPreprocessor:
         logger.info("✅ Preprocessing completed")
         
         return X_train, X_val, X_test, y_train, y_val, y_test
+
+    def preprocess_feature_splits(
+        self,
+        X_train: pd.DataFrame,
+        X_val: pd.DataFrame,
+        X_test: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Fit preprocessing on a training split and transform held-out splits.
+
+        Feature engineering that learns values from data (for example a
+        percentile threshold) must happen after the raw split. This method
+        lets the training pipeline preserve that ordering while still fitting
+        encoders and the scaler only on training rows.
+        """
+        X_train = self.clean_data(X_train)
+        X_val = self.clean_data(X_val)
+        X_test = self.clean_data(X_test)
+
+        X_train = self.encode_categorical(X_train, fit=True)
+        X_val = self.encode_categorical(X_val, fit=False)
+        X_test = self.encode_categorical(X_test, fit=False)
+
+        X_train = self.scale_features(X_train, fit=True)
+        X_val = self.scale_features(X_val, fit=False)
+        X_test = self.scale_features(X_test, fit=False)
+
+        self.feature_names = X_train.columns.tolist()
+        X_val = X_val.reindex(columns=self.feature_names)
+        X_test = X_test.reindex(columns=self.feature_names)
+        return X_train, X_val, X_test
     
     def preprocess_for_serving(self, df: pd.DataFrame) -> pd.DataFrame:
         """

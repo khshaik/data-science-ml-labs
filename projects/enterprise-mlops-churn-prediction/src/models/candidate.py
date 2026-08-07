@@ -9,6 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, models, callbacks
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 import logging
 from typing import Dict, Tuple
@@ -46,6 +47,9 @@ class CandidateModel:
             input_dim: Number of input features
         """
         hyperparams = self.config['models']['candidate']['hyperparameters']
+        random_state = hyperparams.get('random_state', 42)
+        np.random.seed(random_state)
+        tf.random.set_seed(random_state)
         
         # Build sequential model (from original notebook architecture)
         self.model = models.Sequential([
@@ -126,12 +130,21 @@ class CandidateModel:
             )
         ]
         
+        # Balance the minority churn class without modifying validation data.
+        classes = np.unique(y_train)
+        weights = compute_class_weight(
+            class_weight='balanced', classes=classes, y=np.asarray(y_train)
+        )
+        class_weight = {int(label): float(weight) for label, weight in zip(classes, weights)}
+        logger.info(f"   Class weights: {class_weight}")
+
         # Train model
         self.history = self.model.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
             epochs=hyperparams['epochs'],
             batch_size=hyperparams['batch_size'],
+            class_weight=class_weight,
             callbacks=callback_list,
             verbose=1
         )
@@ -144,7 +157,8 @@ class CandidateModel:
             'train_auc': float(self.history.history['auc'][-1]),
             'val_loss': float(self.history.history['val_loss'][-1]),
             'val_accuracy': float(self.history.history['val_accuracy'][-1]),
-            'val_auc': float(self.history.history['val_auc'][-1])
+            'val_auc': float(self.history.history['val_auc'][-1]),
+            'class_weight': class_weight
         }
         
         logger.info("✅ Training completed")

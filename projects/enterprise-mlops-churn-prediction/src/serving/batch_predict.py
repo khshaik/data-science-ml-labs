@@ -14,6 +14,7 @@ from datetime import datetime
 import argparse
 import yaml
 import joblib
+import json
 
 from src.features.engineering import FeatureEngineer
 from src.data.preprocessing import DataPreprocessor
@@ -56,22 +57,25 @@ class BatchPredictor:
         self.preprocessor = DataPreprocessor(self.config)
         self.preprocessor.load_preprocessor('artifacts/preprocessor.pkl')
         
-        # Load model (try candidate first, fallback to baseline)
-        candidate_path = Path('models/candidate/neural_network_v1.h5')
-        baseline_path = Path('models/baseline/logistic_regression_v1.pkl')
-        
-        if candidate_path.exists():
+        champion_path = Path(self.config['models'].get('current_best_path', 'models/current_best.json'))
+        if not champion_path.exists():
+            raise FileNotFoundError("Champion manifest not found; run model evaluation first")
+        with open(champion_path, 'r') as f:
+            champion = json.load(f)
+        selected_path = Path(champion['model_path'])
+
+        if champion['model_type'] == 'candidate':
             import tensorflow as tf
-            self.model = tf.keras.models.load_model(str(candidate_path))
-            self.model_version = "candidate_v1.0.0"
+            self.model = tf.keras.models.load_model(str(selected_path))
+            self.model_version = champion['model_version']
             logger.info("✅ Loaded candidate model (Neural Network)")
-        elif baseline_path.exists():
-            model_data = joblib.load(baseline_path)
+        elif champion['model_type'] == 'baseline':
+            model_data = joblib.load(selected_path)
             self.model = model_data['model']
-            self.model_version = "baseline_v1.0.0"
+            self.model_version = champion['model_version']
             logger.info("✅ Loaded baseline model (Logistic Regression)")
         else:
-            raise FileNotFoundError("No trained model found")
+            raise ValueError(f"Unsupported champion model type: {champion['model_type']}")
     
     def predict_batch(self, input_file: str, output_file: str, chunk_size: int = 1000):
         """
@@ -129,7 +133,7 @@ class BatchPredictor:
                 chunk_proba = self.model.predict(chunk.values, verbose=0).flatten()
             else:
                 # Logistic Regression
-                chunk_proba = self.model.predict_proba(chunk.values)[:, 1]
+                chunk_proba = self.model.predict_proba(chunk)[:, 1]
             
             chunk_pred = (chunk_proba > 0.5).astype(int)
             

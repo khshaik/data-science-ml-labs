@@ -1,0 +1,4 @@
+*.pdf binary
+*.db binary
+*.pkl binary
+*.h5 binary

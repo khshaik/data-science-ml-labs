@@ -1,0 +1,29 @@
+{
+  "sequential": {
+    "num_requests": 100,
+    "success_count": 100,
+    "success_rate": 1.0,
+    "total_time_sec": 0.963695764541626,
+    "avg_latency_ms": 9.564902782440186,
+    "median_latency_ms": 9.215235710144043,
+    "p50_latency_ms": 9.215235710144043,
+    "p95_latency_ms": 10.21195650100708,
+    "p99_latency_ms": 18.792564868927023,
+    "min_latency_ms": 8.301019668579102,
+    "max_latency_ms": 23.011207580566406,
+    "std_latency_ms": 1.9628165547347671
+  },
+  "concurrent": {
+    "num_requests": 100,
+    "concurrency": 10,
+    "success_count": 100,
+    "success_rate": 1.0,
+    "total_time_sec": 0.7918260097503662,
+    "throughput_rps": 126.29037031951798,
+    "avg_latency_ms": 74.63510036468506,
+    "p50_latency_ms": 74.34964179992676,
+    "p95_latency_ms": 89.00529146194458,
+    "p99_latency_ms": 89.89264488220215
+  },
+  "timestamp": "2026-08-08 04:20:18"
+}

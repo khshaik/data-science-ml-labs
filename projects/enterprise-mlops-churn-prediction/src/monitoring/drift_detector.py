@@ -158,6 +158,12 @@ class DriftDetector:
         
         baseline_data = baseline_df[feature_name].dropna()
         current_data = current_df[feature_name].dropna()
+
+        if feature_type == 'continuous':
+            # Raw CSV columns such as TotalCharges may be object-typed because
+            # of blank strings. Drift tests require numeric arrays.
+            baseline_data = pd.to_numeric(baseline_data, errors='coerce').dropna()
+            current_data = pd.to_numeric(current_data, errors='coerce').dropna()
         
         report = {
             'feature': feature_name,

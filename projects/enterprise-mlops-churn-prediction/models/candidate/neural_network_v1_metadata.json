@@ -1,0 +1,245 @@
+{
+  "metrics": {
+    "validation": {
+      "dataset": "validation",
+      "accuracy": 0.7352732434350603,
+      "precision": 0.5008726003490401,
+      "recall": 0.767379679144385,
+      "f1": 0.6061246040126715,
+      "auc": 0.8299943165672066,
+      "confusion_matrix": [
+        [
+          749,
+          286
+        ],
+        [
+          87,
+          287
+        ]
+      ]
+    },
+    "test": {
+      "dataset": "test",
+      "accuracy": 0.7324343506032647,
+      "precision": 0.49747899159663866,
+      "recall": 0.7914438502673797,
+      "f1": 0.6109391124871001,
+      "auc": 0.836389470149061,
+      "confusion_matrix": [
+        [
+          736,
+          299
+        ],
+        [
+          78,
+          296
+        ]
+      ]
+    }
+  },
+  "training_history": {
+    "loss": [
+      0.6217151284217834,
+      0.5443812608718872,
+      0.5228465795516968,
+      0.5223164558410645,
+      0.5168142914772034,
+      0.5115506649017334,
+      0.5012350678443909,
+      0.49985599517822266
+    ],
+    "accuracy": [
+      0.6556212902069092,
+      0.7065088748931885,
+      0.7088757157325745,
+      0.720946729183197,
+      0.720710039138794,
+      0.7315976619720459,
+      0.7358579635620117,
+      0.734437882900238
+    ],
+    "auc": [
+      0.7088766098022461,
+      0.7969849109649658,
+      0.817511796951294,
+      0.8215237855911255,
+      0.8244156241416931,
+      0.8286275267601013,
+      0.835345983505249,
+      0.8366276025772095
+    ],
+    "precision": [
+      0.4057562053203583,
+      0.46846845746040344,
+      0.4725440740585327,
+      0.48452508449554443,
+      0.484233021736145,
+      0.49648457765579224,
+      0.5013638734817505,
+      0.4997248351573944
+    ],
+    "recall": [
+      0.6413916349411011,
+      0.7885816097259521,
+      0.8367528915405273,
+      0.8099910616874695,
+      0.8082069754600525,
+      0.8189116716384888,
+      0.819803774356842,
+      0.8099910616874695
+    ],
+    "val_loss": [
+      0.5045477747917175,
+      0.5319371223449707,
+      0.4894663393497467,
+      0.528188943862915,
+      0.5131059288978577,
+      0.5148038268089294,
+      0.49812453985214233,
+      0.4928598701953888
+    ],
+    "val_accuracy": [
+      0.7210787534713745,
+      0.7111426591873169,
+      0.7352732419967651,
+      0.7111426591873169,
+      0.7217885255813599,
+      0.7146912813186646,
+      0.733853816986084,
+      0.740241289138794
+    ],
+    "val_auc": [
+      0.820461630821228,
+      0.8266539573669434,
+      0.8299943208694458,
+      0.829928457736969,
+      0.8304877281188965,
+      0.8317794799804688,
+      0.8322237730026245,
+      0.8331874012947083
+    ],
+    "val_precision": [
+      0.4842454493045807,
+      0.4746543765068054,
+      0.5008726119995117,
+      0.474097341299057,
+      0.4852941036224365,
+      0.4778481125831604,
+      0.4991482198238373,
+      0.5069444179534912
+    ],
+    "val_recall": [
+      0.7807486653327942,
+      0.8262032270431519,
+      0.7673797011375427,
+      0.8074866533279419,
+      0.7941176295280457,
+      0.8074866533279419,
+      0.7834224700927734,
+      0.7807486653327942
+    ],
+    "lr": [
+      0.0010000000474974513,
+      0.0010000000474974513,
+      0.0010000000474974513,
+      0.0010000000474974513,
+      0.0010000000474974513,
+      0.0010000000474974513,
+      0.0005000000237487257,
+      0.0005000000237487257
+    ]
+  },
+  "config": {
+    "project": {
+      "name": "enterprise-mlops-churn-prediction",
+      "version": "1.0.0",
+      "description": "Production ML system for telco customer churn prediction"
+    },
+    "data": {
+      "raw_path": "data/raw/telco_customer_churn.csv",
+      "processed_path": "data/processed",
+      "training_path": "data/training/training_data_v1.csv",
+      "train_split": 0.6,
+      "val_split": 0.2,
+      "test_split": 0.2,
+      "random_seed": 42,
+      "max_missing_rate": 0.05,
+      "min_row_count": 1000
+    },
+    "models": {
+      "baseline": {
+        "type": "LogisticRegression",
+        "path": "models/baseline",
+        "hyperparameters": {
+          "C": 1.0,
+          "max_iter": 1000,
+          "random_state": 42
+        }
+      },
+      "candidate": {
+        "type": "NeuralNetwork",
+        "path": "models/candidate",
+        "hyperparameters": {
+          "hidden_layers": [
+            64,
+            32,
+            16
+          ],
+          "dropout_rate": 0.3,
+          "learning_rate": 0.001,
+          "epochs": 50,
+          "batch_size": 32,
+          "early_stopping_patience": 5,
+          "random_state": 42
+        }
+      },
+      "current_best_path": "models/current_best.json",
+      "promotion": {
+        "min_auc": 0.8,
+        "min_recall": 0.75,
+        "max_degradation": 0.01
+      }
+    },
+    "serving": {
+      "api": {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "workers": 4,
+        "reload": false
+      },
+      "latency_threshold_ms": 200,
+      "batch_size": 32,
+      "model_cache_ttl_seconds": 3600
+    },
+    "monitoring": {
+      "drift_threshold_psi": 0.2,
+      "drift_threshold_ks_pvalue": 0.05,
+      "missing_rate_threshold": 0.05,
+      "outlier_threshold_std": 3.0,
+      "consistency_is_blocking": false,
+      "min_auc_threshold": 0.75,
+      "max_latency_p95_ms": 200,
+      "max_error_rate": 0.01,
+      "metrics_port": 9090,
+      "metrics_path": "/metrics"
+    },
+    "mlflow": {
+      "tracking_uri": "sqlite:///mlflow.db",
+      "experiment_name": "churn-prediction",
+      "model_registry_name": "churn-predictor",
+      "artifact_location": "mlruns"
+    },
+    "retraining": {
+      "min_new_data_count": 1000,
+      "max_auc_drop": 0.05,
+      "max_drift_score": 0.3,
+      "max_days_since_training": 30,
+      "schedule_cron": "0 0 * * 0"
+    },
+    "logging": {
+      "level": "INFO",
+      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+      "log_dir": "artifacts/logs"
+    }
+  }
+}

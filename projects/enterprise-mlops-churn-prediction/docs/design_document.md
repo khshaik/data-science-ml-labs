@@ -3,8 +3,8 @@
 
 **Project**: Telco Customer Churn Prediction with Production MLOps Pipeline  
 **Author**: BITS Pilani MSc Student  
-**Date**: August 2024  
-**Version**: 1.0.0
+**Date**: August 2026
+**Version**: 2.0.0 (verified results)
 
 ---
 
@@ -131,14 +131,14 @@ class FeatureEngineer:
 - **Justification**: Simple, interpretable, fast baseline
 - **Hyperparameters**: C=1.0, max_iter=1000, class_weight='balanced'
 - **Advantages**: Feature importance, low latency (~5ms), explainable to business
-- **Expected Performance**: AUC ~0.78-0.82
+- **Measured Validation Performance**: AUC 0.8354, Recall 0.7941
 
 **Candidate Model: Neural Network**
 - **Justification**: Captures non-linear patterns, higher capacity
 - **Architecture**: [64, 32, 16] hidden layers with dropout (0.3)
 - **Training**: Early stopping (patience=5), learning rate scheduling
-- **Expected Performance**: AUC ~0.82-0.86
-- **Trade-off**: Higher latency (~50ms) but better accuracy
+- **Measured Validation Performance**: AUC 0.8300, Recall 0.7674
+- **Trade-off**: Higher complexity without a validation improvement in this run
 
 ### 3.2 Evaluation Strategy
 
@@ -159,18 +159,18 @@ class FeatureEngineer:
 
 **Rules** (from `src/training/evaluate.py`):
 1. **Minimum Performance**: AUC ≥ 0.80, Recall ≥ 0.75
-2. **No Regression**: Not worse than baseline by > 0.01
+2. **Complexity Guardrail**: Candidate validation AUC must not be below baseline
 3. **Automated Decision**: Promote if all guardrails pass
 
-**Example Evaluation**:
+**Measured Evaluation**:
 ```
-Baseline:  AUC=0.81, Recall=0.76, Precision=0.68
-Candidate: AUC=0.84, Recall=0.79, Precision=0.71
+Baseline:  AUC=0.8354, Recall=0.7941, Precision=0.5174
+Candidate: AUC=0.8300, Recall=0.7674, Precision=0.5009
 
-Decision: ✅ PROMOTE CANDIDATE
-- AUC 0.84 ≥ 0.80 ✓
-- Recall 0.79 ≥ 0.75 ✓
-- AUC improvement: +0.03 (no regression) ✓
+Decision: KEEP BASELINE
+- Candidate AUC 0.8300 ≥ 0.80: pass
+- Candidate Recall 0.7674 ≥ 0.75: pass
+- Candidate AUC gain -0.0054 ≥ 0.0: fail
 ```
 
 ### 3.4 Model Artifacts
@@ -192,8 +192,8 @@ Decision: ✅ PROMOTE CANDIDATE
 
 | Pattern | Use Case | Latency | Throughput | Justification |
 |---------|----------|---------|------------|---------------|
-| **Online API** | Customer service calls | < 200ms | 150-200 req/sec | Human waiting, immediate action |
-| **Batch Pipeline** | Monthly campaigns | Minutes | 230+ rows/sec | Cost-effective for large volumes |
+| **Online API** | Customer service calls | 10.21ms sequential p95 | 126.29 req/sec concurrent | Human waiting, immediate action |
+| **Batch Pipeline** | Monthly campaigns | < 1 second locally | 27,000+ rows/sec locally | Cost-effective for large volumes |
 | **Web Dashboard** | Interactive exploration | < 1s | N/A | Business user self-service |
 
 ### 4.2 Online API Design
@@ -231,14 +231,14 @@ GET  /metrics      - Prometheus metrics
 ### 4.3 Performance Measurement
 
 **Latency Benchmarking** (`scripts/benchmark_latency.py`):
-- **Sequential**: 200 requests, measure avg/p50/p95/p99
-- **Concurrent**: 200 requests with 10 concurrent workers
+- **Sequential**: 100 requests, measure avg/p50/p95/p99
+- **Concurrent**: 100 requests with 10 concurrent workers
 
 **Measured Performance**:
-- Average latency: ~50ms
-- P95 latency: ~120ms
-- P99 latency: ~180ms
-- Throughput: 150-200 requests/sec
+- Sequential average latency: 9.56ms
+- Sequential p95 latency: 10.21ms
+- Sequential p99 latency: 18.79ms
+- Concurrent throughput: 126.29 requests/sec
 
 **Meets Requirements**: ✅ < 200ms latency threshold
 
@@ -252,7 +252,7 @@ GET  /metrics      - Prometheus metrics
 - Risk level classification (Low/Medium/High)
 - Output: CSV with customerID, probability, prediction, risk level
 
-**Performance**: 230+ rows/sec (entire dataset in ~30 seconds)
+**Performance**: 7,043 rows processed in approximately 0.25 seconds locally
 
 ---
 
@@ -415,13 +415,13 @@ Decision: DRIFT DETECTED
 
 ### 7.1 Trade-offs
 
-**Accuracy vs Latency**:
-- Neural Network: Higher accuracy (+3% AUC) but slower (~50ms)
-- Logistic Regression: Lower accuracy but faster (~5ms)
-- **Decision**: Use Neural Network (accuracy more important than 45ms difference)
+**Accuracy vs Complexity**:
+- Neural Network: slightly lower validation AUC and recall in the verified run
+- Logistic Regression: simpler, interpretable, and stronger on validation metrics
+- **Decision**: retain Logistic Regression as champion
 
 **Recall vs Precision**:
-- High recall (0.79): Catch more churners but more false alarms
+- Baseline recall (0.7941): catches more churners but produces more false alarms
 - High precision: Fewer false alarms but miss churners
 - **Decision**: Prioritize recall (missing churners is costlier)
 
@@ -508,29 +508,29 @@ Decision: DRIFT DETECTED
 
 ## 8. Conclusion
 
-This enterprise MLOps churn prediction system demonstrates production-grade machine learning with:
+This mini production ML system is a production-oriented prototype demonstrating:
 
 ✅ **Complete ML Pipeline**: Data ingestion → Feature engineering → Training → Evaluation → Serving → Monitoring  
-✅ **Production Readiness**: Latency < 200ms, promotion guardrails, drift detection, retraining triggers  
+✅ **Production Considerations**: Latency measurement, promotion guardrails, drift detection, retraining triggers
 ✅ **Hybrid Inference**: Online API + Batch pipeline + Web dashboard  
 ✅ **MLOps Best Practices**: MLflow tracking, Docker containerization, CI/CD, comprehensive testing  
 ✅ **Responsible AI**: SHAP/LIME explainability, fairness considerations, audit trails  
 
 **Business Value**:
-- Predict churn with 84% AUC, 79% recall
+- Baseline test AUC 0.8429 and test recall 0.7807
 - Enable proactive retention (15-20% churn reduction target)
-- Cost-effective at scale (230+ predictions/sec batch, < 200ms online)
+- Verified local batch and online inference paths
 
 **Technical Excellence**:
 - Training-serving consistency (shared feature engineering)
 - Automated quality gates (data validation, model promotion)
 - Comprehensive monitoring (3-layer: infra, data, model)
-- Production-grade code (tested, documented, containerized)
+- Modular code with 96 passing unit tests and 69% source coverage
 
-This system is ready for production deployment and continuous improvement.
+This system is suitable as a mini production ML prototype; cloud deployment and production hardening remain future work.
 
 ---
 
-**Document Version**: 1.0.0  
-**Last Updated**: August 2024  
+**Document Version**: 2.0.0
+**Last Updated**: August 2026
 **Total Pages**: 6

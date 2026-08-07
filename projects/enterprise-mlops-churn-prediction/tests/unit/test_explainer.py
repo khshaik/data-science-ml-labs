@@ -1,157 +1,71 @@
-"""
-Unit tests for model explainability
-"""
+"""Tests for the implemented SHAP/LIME explainer interface."""
 
-import pytest
-import pandas as pd
-import numpy as np
-from pathlib import Path
+import json
 from unittest.mock import Mock, patch
+
+import numpy as np
+import pandas as pd
+
 from src.models.explainer import ModelExplainer
 
 
-@pytest.fixture
-def model_explainer(base_config):
-    """Create ModelExplainer instance"""
-    return ModelExplainer(base_config)
+def _data():
+    return pd.DataFrame({"feature_1": [1.0, 1.5], "feature_2": [2.0, 2.5]})
 
 
-@pytest.fixture
-def sample_model_and_data():
-    """Create sample model and data for explanation"""
-    # Create mock model
-    mock_model = Mock()
-    mock_model.predict.return_value = np.array([[0.7]])
-    mock_model.predict_proba = Mock(return_value=np.array([[0.3, 0.7]]))
-    
-    # Create sample data
-    X = pd.DataFrame({
-        'feature_1': [1.0],
-        'feature_2': [2.0],
-        'feature_3': [3.0],
-        'feature_4': [4.0],
-        'feature_5': [5.0]
-    })
-    
-    feature_names = X.columns.tolist()
-    
-    return mock_model, X, feature_names
+@patch("src.models.explainer.LimeTabularExplainer")
+@patch("src.models.explainer.shap.Explainer")
+def test_initialization_uses_supplied_model_and_background(mock_shap, mock_lime):
+    model = Mock()
+    data = _data()
+    explainer = ModelExplainer(model, data, list(data.columns), "baseline")
+    assert explainer.model is model
+    assert explainer.feature_names == ["feature_1", "feature_2"]
+    mock_shap.assert_called_once()
+    mock_lime.assert_called_once()
 
 
-def test_model_explainer_initialization(model_explainer):
-    """Test ModelExplainer initialization"""
-    assert model_explainer is not None
-    assert model_explainer.config is not None
+@patch("src.models.explainer.LimeTabularExplainer")
+@patch("src.models.explainer.shap.Explainer")
+def test_single_shap_explanation_returns_ranked_contributions(mock_shap, mock_lime):
+    values = Mock()
+    values.values = np.array([[0.1, -0.4]])
+    values.base_values = np.array([0.3])
+    values.shape = values.values.shape
+    mock_shap.return_value.return_value = values
+    data = _data()
+    explainer = ModelExplainer(Mock(), data, list(data.columns), "baseline")
+
+    result = explainer.explain_single_prediction_shap(data.iloc[[0]], "C1")
+
+    assert result["customer_id"] == "C1"
+    assert result["top_contributions"][0][0] == "feature_2"
+    assert result["method"] == "SHAP"
 
 
-@patch('src.models.explainer.shap.Explainer')
-def test_create_shap_explainer(mock_shap_explainer, model_explainer, sample_model_and_data):
-    """Test creating SHAP explainer"""
-    mock_model, X, feature_names = sample_model_and_data
-    
-    mock_explainer_instance = Mock()
-    mock_shap_explainer.return_value = mock_explainer_instance
-    
-    explainer = model_explainer.create_shap_explainer(mock_model, X)
-    
-    assert explainer is not None
+@patch("src.models.explainer.LimeTabularExplainer")
+@patch("src.models.explainer.shap.Explainer")
+def test_lime_explanation_uses_positive_class_probability(mock_shap, mock_lime):
+    lime_result = Mock()
+    lime_result.as_list.return_value = [("feature_1", 0.2), ("feature_2", -0.1)]
+    lime_result.predict_proba = np.array([0.3, 0.7])
+    mock_lime.return_value.explain_instance.return_value = lime_result
+    model = Mock()
+    model.predict_proba.return_value = np.array([[0.3, 0.7]])
+    data = _data()
+    explainer = ModelExplainer(model, data, list(data.columns), "baseline")
+
+    result = explainer.explain_with_lime(data.iloc[[0]], "C1")
+
+    assert result["prediction_probability"] == 0.7
+    assert result["method"] == "LIME"
 
 
-@patch('src.models.explainer.shap.Explainer')
-def test_explain_prediction(mock_shap_explainer, model_explainer, sample_model_and_data):
-    """Test explaining a single prediction"""
-    mock_model, X, feature_names = sample_model_and_data
-    
-    # Mock SHAP explainer and values
-    mock_explainer_instance = Mock()
-    mock_shap_values = Mock()
-    mock_shap_values.values = np.array([[0.1, 0.2, 0.3, 0.15, 0.25]])
-    mock_shap_values.base_values = np.array([0.5])
-    mock_explainer_instance.return_value = mock_shap_values
-    mock_shap_explainer.return_value = mock_explainer_instance
-    
-    explanation = model_explainer.explain_prediction(
-        mock_model, X.iloc[0:1], feature_names
-    )
-    
-    assert explanation is not None
-    assert isinstance(explanation, dict)
-
-
-def test_get_feature_importance(model_explainer):
-    """Test getting feature importance from SHAP values"""
-    shap_values = np.array([[0.1, 0.2, 0.3, 0.15, 0.25]])
-    feature_names = ['feature_1', 'feature_2', 'feature_3', 'feature_4', 'feature_5']
-    
-    importance = model_explainer.get_feature_importance(shap_values, feature_names)
-    
-    assert isinstance(importance, dict)
-    assert len(importance) == len(feature_names)
-    assert all(name in importance for name in feature_names)
-
-
-@patch('matplotlib.pyplot.savefig')
-@patch('src.models.explainer.shap.plots.waterfall')
-def test_plot_waterfall(mock_waterfall, mock_savefig, model_explainer, tmp_path):
-    """Test plotting SHAP waterfall plot"""
-    # Mock SHAP explanation
-    mock_explanation = Mock()
-    mock_explanation.values = np.array([0.1, 0.2, 0.3])
-    mock_explanation.base_values = 0.5
-    mock_explanation.data = np.array([1.0, 2.0, 3.0])
-    
-    output_path = tmp_path / "waterfall.png"
-    model_explainer.plot_waterfall(mock_explanation, str(output_path))
-    
-    assert mock_savefig.called
-
-
-@patch('matplotlib.pyplot.savefig')
-@patch('src.models.explainer.shap.plots.bar')
-def test_plot_feature_importance(mock_bar, mock_savefig, model_explainer, tmp_path):
-    """Test plotting feature importance"""
-    importance = {
-        'feature_1': 0.3,
-        'feature_2': 0.25,
-        'feature_3': 0.2,
-        'feature_4': 0.15,
-        'feature_5': 0.1
-    }
-    
-    output_path = tmp_path / "feature_importance.png"
-    model_explainer.plot_feature_importance(importance, str(output_path))
-    
-    assert mock_savefig.called
-
-
-def test_generate_explanation_report(model_explainer, sample_model_and_data):
-    """Test generating explanation report"""
-    mock_model, X, feature_names = sample_model_and_data
-    
-    report = {
-        'prediction': 0.7,
-        'feature_contributions': {
-            'feature_1': 0.1,
-            'feature_2': 0.2,
-            'feature_3': 0.3
-        },
-        'top_features': ['feature_3', 'feature_2', 'feature_1']
-    }
-    
-    assert isinstance(report, dict)
-    assert 'prediction' in report
-    assert 'feature_contributions' in report
-
-
-def test_save_explanation(model_explainer, tmp_path):
-    """Test saving explanation to file"""
-    explanation = {
-        'prediction': 0.7,
-        'feature_contributions': {'feature_1': 0.1, 'feature_2': 0.2},
-        'timestamp': '2024-01-01 12:00:00'
-    }
-    
-    output_path = tmp_path / "explanation.json"
-    model_explainer.save_explanation(explanation, str(output_path))
-    
-    assert output_path.exists()
+@patch("src.models.explainer.LimeTabularExplainer")
+@patch("src.models.explainer.shap.Explainer")
+def test_save_explanation_writes_json(mock_shap, mock_lime, tmp_path):
+    data = _data()
+    explainer = ModelExplainer(Mock(), data, list(data.columns), "baseline")
+    output = tmp_path / "explanation.json"
+    explainer.save_explanation({"prediction_probability": 0.7}, str(output))
+    assert json.loads(output.read_text())["prediction_probability"] == 0.7

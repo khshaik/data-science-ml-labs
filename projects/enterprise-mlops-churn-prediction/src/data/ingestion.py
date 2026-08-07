@@ -14,7 +14,7 @@ import yaml
 import json
 import argparse
 
-from src.data.quality import DataQualityChecker
+from src.data.quality import DataQualityChecker, _json_default
 
 logging.basicConfig(
     level=logging.INFO,
@@ -143,7 +143,7 @@ class DataIngestion:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"ingestion_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         with open(log_file, 'w') as f:
-            json.dump(summary, f, indent=2)
+            json.dump(summary, f, indent=2, default=_json_default)
         logger.info(f"✅ Ingestion log saved to {log_file}")
         
         return summary

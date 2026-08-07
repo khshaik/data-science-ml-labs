@@ -15,6 +15,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
+import json
 import yaml
 import joblib
 
@@ -145,22 +146,26 @@ async def load_model():
         preprocessor = DataPreprocessor(config)
         preprocessor.load_preprocessor('artifacts/preprocessor.pkl')
         
-        # Load model (try candidate first, fallback to baseline)
-        candidate_path = Path('models/candidate/neural_network_v1.h5')
-        baseline_path = Path('models/baseline/logistic_regression_v1.pkl')
-        
-        if candidate_path.exists():
+        # Load the champion selected by the validation guardrails.
+        champion_path = Path(config['models'].get('current_best_path', 'models/current_best.json'))
+        if not champion_path.exists():
+            raise FileNotFoundError("Champion manifest not found; run model evaluation first")
+        with open(champion_path, 'r') as f:
+            champion = json.load(f)
+        selected_path = Path(champion['model_path'])
+
+        if champion['model_type'] == 'candidate':
             import tensorflow as tf
-            model = tf.keras.models.load_model(str(candidate_path))
-            model_version = "candidate_v1.0.0"
+            model = tf.keras.models.load_model(str(selected_path))
+            model_version = champion['model_version']
             logger.info("✅ Loaded candidate model (Neural Network)")
-        elif baseline_path.exists():
-            model_data = joblib.load(baseline_path)
+        elif champion['model_type'] == 'baseline':
+            model_data = joblib.load(selected_path)
             model = model_data['model']
-            model_version = "baseline_v1.0.0"
+            model_version = champion['model_version']
             logger.info("✅ Loaded baseline model (Logistic Regression)")
         else:
-            raise FileNotFoundError("No trained model found")
+            raise ValueError(f"Unsupported champion model type: {champion['model_type']}")
         
         logger.info(f"✅ Model loaded successfully: {model_version}")
         
@@ -170,8 +175,9 @@ async def load_model():
             
             # Load a small sample of training data for explainer
             df_sample = pd.read_csv('data/raw/telco_customer_churn.csv').head(100)
-            df_sample = feature_engineer.create_features(df_sample, mode='offline')
-            X_train_sample, _, _, _, _, _ = preprocessor.preprocess_for_training(df_sample)
+            df_sample = feature_engineer.create_features(df_sample, mode='online')
+            X_train_sample = preprocessor.preprocess_for_serving(df_sample)
+            X_train_sample = X_train_sample[preprocessor.feature_names]
             
             # Create explainer
             model_type_str = 'candidate' if 'candidate' in model_version else 'baseline'
@@ -250,7 +256,7 @@ async def predict(customer: CustomerData):
             churn_proba = float(model.predict(df.values, verbose=0)[0][0])
         else:
             # Logistic Regression
-            churn_proba = float(model.predict_proba(df.values)[0][1])
+            churn_proba = float(model.predict_proba(df)[0][1])
         
         # Determine prediction and risk level
         churn_prediction = "Yes" if churn_proba > 0.5 else "No"

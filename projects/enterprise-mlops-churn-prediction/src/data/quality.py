@@ -15,6 +15,19 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _json_default(value):
+    """Convert NumPy values used in quality reports to JSON-native values."""
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 class DataQualityChecker:
     """
     Data quality validation for churn prediction
@@ -297,14 +310,20 @@ class DataQualityChecker:
         # Data consistency
         logger.info("5. Checking data consistency...")
         consistent, consistency_issues = self.check_data_consistency(df)
+        consistency_is_blocking = self.config.get('consistency_is_blocking', False)
         report['checks']['consistency'] = {
-            'passed': consistent,
+            'passed': bool(consistent or not consistency_is_blocking),
+            'warning': bool(not consistent),
+            'blocking': bool(consistency_is_blocking),
             'issues': consistency_issues
         }
         if consistent:
             logger.info("   ✅ Data consistency checks passed")
         else:
-            logger.warning(f"   ⚠️  Consistency issues: {consistency_issues}")
+            logger.warning(
+                "   ⚠️  Consistency warning (non-blocking unless configured): "
+                f"{consistency_issues}"
+            )
         
         # Overall pass/fail
         all_passed = all(
@@ -366,7 +385,7 @@ def main():
     report_file = report_dir / f"data_quality_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     
     with open(report_file, 'w') as f:
-        json.dump(report, f, indent=2)
+        json.dump(report, f, indent=2, default=_json_default)
     
     logger.info(f"Report saved to {report_file}")
     

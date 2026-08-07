@@ -1,0 +1,8 @@
+{
+  "verification_date": "2026-08-08",
+  "tests_collected": 96,
+  "tests_passed": 96,
+  "tests_failed": 0,
+  "source_coverage_percent": 69,
+  "command": "python -m pytest tests/unit -q --cov=src"
+}

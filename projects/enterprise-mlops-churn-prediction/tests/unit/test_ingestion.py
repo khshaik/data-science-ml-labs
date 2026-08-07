@@ -1,146 +1,84 @@
-"""
-Unit tests for data ingestion
-"""
+"""Tests for the public batch-ingestion workflow."""
 
-import pytest
+import yaml
 import pandas as pd
-import numpy as np
-from pathlib import Path
+
 from src.data.ingestion import DataIngestion
 
 
-@pytest.fixture
-def data_ingestion(base_config, tmp_path):
-    """Create DataIngestion instance with temp directory"""
-    config = base_config.copy()
-    config['data_path'] = str(tmp_path / "test_data.csv")
-    return DataIngestion(config)
+def _write_config(path):
+    path.write_text(yaml.safe_dump({"monitoring": {
+        "missing_rate_threshold": 0.05,
+        "consistency_is_blocking": False,
+    }}))
 
 
-@pytest.fixture
-def sample_csv_file(tmp_path):
-    """Create a sample CSV file"""
-    data = pd.DataFrame({
-        'customerID': ['C001', 'C002', 'C003'],
-        'gender': ['Male', 'Female', 'Male'],
-        'SeniorCitizen': [0, 1, 0],
-        'Partner': ['Yes', 'No', 'Yes'],
-        'Dependents': ['No', 'No', 'Yes'],
-        'tenure': [12, 24, 36],
-        'PhoneService': ['Yes', 'Yes', 'No'],
-        'MultipleLines': ['No', 'Yes', 'No phone service'],
-        'InternetService': ['DSL', 'Fiber optic', 'DSL'],
-        'OnlineSecurity': ['Yes', 'No', 'No'],
-        'OnlineBackup': ['No', 'Yes', 'No'],
-        'DeviceProtection': ['No', 'No', 'No'],
-        'TechSupport': ['Yes', 'No', 'No'],
-        'StreamingTV': ['No', 'Yes', 'No'],
-        'StreamingMovies': ['No', 'Yes', 'No'],
-        'Contract': ['One year', 'Month-to-month', 'Two year'],
-        'PaperlessBilling': ['Yes', 'Yes', 'No'],
-        'PaymentMethod': ['Electronic check', 'Mailed check', 'Bank transfer'],
-        'MonthlyCharges': [50.0, 80.0, 60.0],
-        'TotalCharges': ['600.0', '1920.0', '2160.0'],
-        'Churn': ['No', 'Yes', 'No']
+def _valid_rows():
+    return pd.DataFrame({
+        "customerID": ["C001", "C002"], "gender": ["Male", "Female"],
+        "SeniorCitizen": [0, 1], "Partner": ["Yes", "No"],
+        "Dependents": ["No", "No"], "tenure": [12, 24],
+        "PhoneService": ["Yes", "Yes"], "MultipleLines": ["No", "Yes"],
+        "InternetService": ["DSL", "Fiber optic"],
+        "OnlineSecurity": ["Yes", "No"], "OnlineBackup": ["No", "Yes"],
+        "DeviceProtection": ["No", "No"], "TechSupport": ["Yes", "No"],
+        "StreamingTV": ["No", "Yes"], "StreamingMovies": ["No", "Yes"],
+        "Contract": ["One year", "Month-to-month"],
+        "PaperlessBilling": ["Yes", "Yes"],
+        "PaymentMethod": ["Electronic check", "Mailed check"],
+        "MonthlyCharges": [50.0, 80.0], "TotalCharges": ["600.0", "1920.0"],
+        "Churn": ["No", "Yes"],
     })
-    
-    csv_path = tmp_path / "test_data.csv"
-    data.to_csv(csv_path, index=False)
-    return csv_path
 
 
-def test_data_ingestion_initialization(data_ingestion):
-    """Test DataIngestion initialization"""
-    assert data_ingestion is not None
-    assert data_ingestion.config is not None
+def test_ingest_batch_creates_training_file_and_summary(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path)
+    incoming = tmp_path / "incoming.csv"
+    output = tmp_path / "training.csv"
+    _valid_rows().to_csv(incoming, index=False)
+
+    summary = DataIngestion(str(config_path)).ingest_batch(str(incoming), str(output))
+
+    assert summary["status"] == "success"
+    assert summary["new_rows"] == 2
+    assert output.exists()
+    assert len(pd.read_csv(output)) == 2
+    assert list((tmp_path / "artifacts/logs").glob("ingestion_*.json"))
 
 
-def test_load_data(data_ingestion, sample_csv_file):
-    """Test loading data from CSV"""
-    data_ingestion.config['data_path'] = str(sample_csv_file)
-    df = data_ingestion.load_data()
-    
-    assert isinstance(df, pd.DataFrame)
-    assert len(df) == 3
-    assert 'customerID' in df.columns
-    assert 'Churn' in df.columns
+def test_ingest_batch_merges_and_deduplicates_by_customer(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path)
+    output = tmp_path / "training.csv"
+    existing = _valid_rows().iloc[[0]].copy()
+    existing.to_csv(output, index=False)
+    incoming_data = _valid_rows()
+    incoming_data.loc[0, "MonthlyCharges"] = 55.0
+    incoming = tmp_path / "incoming.csv"
+    incoming_data.to_csv(incoming, index=False)
+
+    summary = DataIngestion(str(config_path)).ingest_batch(str(incoming), str(output))
+    merged = pd.read_csv(output)
+
+    assert summary["duplicates_removed"] == 1
+    assert len(merged) == 2
+    assert merged.loc[merged.customerID == "C001", "MonthlyCharges"].iloc[0] == 55.0
 
 
-def test_validate_schema(data_ingestion, sample_csv_file):
-    """Test schema validation"""
-    data_ingestion.config['data_path'] = str(sample_csv_file)
-    df = data_ingestion.load_data()
-    
-    # Should not raise exception for valid schema
-    is_valid = data_ingestion.validate_schema(df)
-    assert is_valid is True
+def test_ingest_batch_rejects_invalid_schema(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path)
+    incoming = tmp_path / "invalid.csv"
+    pd.DataFrame({"customerID": ["C001"]}).to_csv(incoming, index=False)
 
+    summary = DataIngestion(str(config_path)).ingest_batch(
+        str(incoming), str(tmp_path / "training.csv")
+    )
 
-def test_validate_schema_missing_column(data_ingestion, tmp_path):
-    """Test schema validation with missing column"""
-    # Create data with missing column
-    data = pd.DataFrame({
-        'customerID': ['C001', 'C002'],
-        'gender': ['Male', 'Female']
-        # Missing other required columns
-    })
-    
-    csv_path = tmp_path / "invalid_data.csv"
-    data.to_csv(csv_path, index=False)
-    
-    data_ingestion.config['data_path'] = str(csv_path)
-    df = data_ingestion.load_data()
-    
-    is_valid = data_ingestion.validate_schema(df)
-    assert is_valid is False
-
-
-def test_get_data_summary(data_ingestion, sample_csv_file):
-    """Test getting data summary statistics"""
-    data_ingestion.config['data_path'] = str(sample_csv_file)
-    df = data_ingestion.load_data()
-    
-    summary = data_ingestion.get_data_summary(df)
-    
-    assert isinstance(summary, dict)
-    assert 'num_rows' in summary
-    assert 'num_columns' in summary
-    assert summary['num_rows'] == 3
-    assert summary['num_columns'] > 0
-
-
-def test_check_missing_values(data_ingestion, tmp_path):
-    """Test checking for missing values"""
-    # Create data with missing values
-    data = pd.DataFrame({
-        'customerID': ['C001', 'C002', 'C003'],
-        'gender': ['Male', None, 'Male'],
-        'tenure': [12, 24, None],
-        'Churn': ['No', 'Yes', 'No']
-    })
-    
-    csv_path = tmp_path / "data_with_missing.csv"
-    data.to_csv(csv_path, index=False)
-    
-    data_ingestion.config['data_path'] = str(csv_path)
-    df = data_ingestion.load_data()
-    
-    missing_report = data_ingestion.check_missing_values(df)
-    
-    assert isinstance(missing_report, dict)
-    assert len(missing_report) > 0
-
-
-def test_save_data(data_ingestion, sample_csv_file, tmp_path):
-    """Test saving data to file"""
-    data_ingestion.config['data_path'] = str(sample_csv_file)
-    df = data_ingestion.load_data()
-    
-    output_path = tmp_path / "output_data.csv"
-    data_ingestion.save_data(df, str(output_path))
-    
-    assert output_path.exists()
-    
-    # Verify saved data
-    loaded_df = pd.read_csv(output_path)
-    assert len(loaded_df) == len(df)
+    assert summary["status"] == "failed"
+    assert summary["reason"] == "data_quality_checks_failed"
+    assert not (tmp_path / "training.csv").exists()

@@ -226,6 +226,7 @@ class FeatureEngineer:
             'high_value_threshold': self.high_value_threshold,
             'timestamp': pd.Timestamp.now().isoformat()
         }
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         with open(filepath, 'w') as f:
             json.dump(threshold_data, f, indent=2)
         logger.info(f"Saved threshold to {filepath}")

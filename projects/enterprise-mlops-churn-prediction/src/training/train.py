@@ -70,20 +70,27 @@ class TrainingPipeline:
             logger.info(f"✅ Loaded {len(df)} rows, {len(df.columns)} columns")
             mlflow.log_metric("dataset_size", len(df))
             
-            # Step 2: Feature engineering
-            logger.info("\n[2/6] Creating features...")
+            # Step 2: Split raw data before fitting data-derived features.
+            # This prevents the high-value percentile from seeing validation
+            # or test rows.
+            logger.info("\n[2/6] Splitting raw data and creating features...")
+            preprocessor = DataPreprocessor(self.config)
+            X_train_raw, X_val_raw, X_test_raw, y_train, y_val, y_test = preprocessor.split_data(df)
+
             engineer = FeatureEngineer()
-            df = engineer.create_features(df, mode='offline')
+            X_train_features = engineer.create_features(X_train_raw, mode='offline')
+            X_val_features = engineer.create_features(X_val_raw, mode='online')
+            X_test_features = engineer.create_features(X_test_raw, mode='online')
             logger.info(f"✅ Created {len(engineer.get_engineered_feature_names())} engineered features")
-            
-            # Save feature threshold for serving
+
             engineer.save_threshold('artifacts/feature_threshold.json')
             mlflow.log_artifact('artifacts/feature_threshold.json')
-            
-            # Step 3: Preprocessing
-            logger.info("\n[3/6] Preprocessing data...")
-            preprocessor = DataPreprocessor(self.config)
-            X_train, X_val, X_test, y_train, y_val, y_test = preprocessor.preprocess_for_training(df)
+
+            # Step 3: Fit encoders/scaler on training rows only.
+            logger.info("\n[3/6] Preprocessing feature splits...")
+            X_train, X_val, X_test = preprocessor.preprocess_feature_splits(
+                X_train_features, X_val_features, X_test_features
+            )
             
             # Save preprocessor for serving
             preprocessor.save_preprocessor('artifacts/preprocessor.pkl')

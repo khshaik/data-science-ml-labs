@@ -1,0 +1,7 @@
+{
+  "model_type": "baseline",
+  "model_version": "baseline_v1.0.0",
+  "model_path": "models/baseline/logistic_regression_v1.pkl",
+  "selection_dataset": "validation",
+  "reason": "Candidate does not improve baseline validation AUC: difference -0.0054 < required gain 0.0000"
+}

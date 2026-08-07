@@ -1,0 +1,14 @@
+{
+  "verification_date": "2026-08-08",
+  "health_status": "healthy",
+  "http_status": 200,
+  "request_file": "sample_request.json",
+  "response": {
+    "churn_probability": 0.7609171154691652,
+    "churn_prediction": "Yes",
+    "risk_level": "High",
+    "model_version": "baseline_v1.0.0",
+    "latency_ms": 8.394002914428711
+  },
+  "metrics_endpoint_verified": true
+}
