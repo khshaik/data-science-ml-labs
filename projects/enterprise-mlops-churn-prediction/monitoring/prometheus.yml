@@ -7,8 +7,11 @@ global:
   external_labels:
     monitor: 'churn-prediction-monitor'
 
-# Rules are evaluated locally. External Alertmanager notification routing is
-# intentionally omitted until a destination and credentials are supplied.
+# Send firing and resolved rule events to the Compose-managed Alertmanager.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
 
 # Scrape configurations
 scrape_configs:

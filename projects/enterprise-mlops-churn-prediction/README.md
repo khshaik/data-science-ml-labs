@@ -37,7 +37,7 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 | Online REST and offline batch inference | **Implemented and executed** | [`src/serving/api.py`](src/serving/api.py), [`src/serving/batch_predict.py`](src/serving/batch_predict.py) |
 | Docker API runtime boundary and health checks | **Implemented and clean-built locally** | [`docker/Dockerfile.api`](docker/Dockerfile.api), [`docker/requirements.api.txt`](docker/requirements.api.txt) |
 | Prometheus rules and Grafana provisioning | **Implemented and verified end to end** | [`artifacts/monitoring/stack_verification.json`](artifacts/monitoring/stack_verification.json) |
-| External notification delivery | **Intentionally not enabled** | Alert rules evaluate locally; no Alertmanager destination or external credentials are configured |
+| Alert notification delivery | **Internal verified; external ready for credentials** | [`notification_routing_verification.json`](artifacts/monitoring/notification_routing_verification.json) records live internal delivery; the secure template fans warning/critical alerts out to webhook, Slack, and email without committing secrets |
 | Drift detection and retraining eligibility | **Implemented and locally exercised** | [`src/monitoring/drift_detector.py`](src/monitoring/drift_detector.py), [`src/retraining/trigger.py`](src/retraining/trigger.py) |
 | GitHub Actions lifecycle workflow | **Implemented; hosted run pending** | [`.github/workflows/enterprise-mlops-churn-ci.yml`](../../.github/workflows/enterprise-mlops-churn-ci.yml) |
 | Automated production deployment or retraining | **Outside current scope** | CI validates readiness; a human or CI invocation starts training and no external environment is mutated automatically |
@@ -254,8 +254,10 @@ The Docker Compose monitoring path is fully wired:
 FastAPI /metrics
       ↓ scrape every 10 seconds
 Prometheus + mounted alerts.yml
-      ↓ provisioned datasource UID: prometheus
-Grafana + provisioned dashboard UID: churn-model-performance
+      ├── firing/resolved → Alertmanager → internal JSONL audit receiver
+      │                                  └→ external webhook + Slack + email
+      │                                     (credential-enabled warning/critical route)
+      └── metrics datasource → Grafana dashboard UID: churn-model-performance
 ```
 
 Prometheus mounts both [`monitoring/prometheus.yml`](monitoring/prometheus.yml) and [`monitoring/alerts.yml`](monitoring/alerts.yml). The alert rules are:
@@ -282,7 +284,16 @@ Grafana provisioning is version-controlled and mounted read-only:
 - all four expected rules loaded; and
 - Grafana health, datasource, and dashboard API checks returning HTTP `200`.
 
-Alert **evaluation** is implemented. External notifications are intentionally excluded because no Alertmanager receiver, email, Slack, PagerDuty, or other destination and credentials were supplied.
+Alertmanager is mounted and registered in Prometheus. Its default receiver posts both firing and resolved notifications to the network-internal [`monitoring/notification_sink.py`](monitoring/notification_sink.py), which persists append-only JSONL audit records in the `notification-data` volume. This path requires no external credentials and is not published outside the Compose network.
+
+For simultaneous internal and external delivery, copy [`monitoring/alertmanager/alertmanager.external.example.yml`](monitoring/alertmanager/alertmanager.external.example.yml) to the Git-ignored `monitoring/alertmanager/alertmanager.local.yml`, replace the SMTP deployment values, and create the untracked files `external_webhook_url`, `slack_webhook_url`, and `smtp_password` under `monitoring/alertmanager/secrets/`. Then start the stack with:
+
+```bash
+ALERTMANAGER_CONFIG_FILE=../monitoring/alertmanager/alertmanager.local.yml \
+  docker compose -f docker/docker-compose.yml up -d
+```
+
+The external template uses file-backed credentials. All severities remain in the internal audit receiver, while warning and critical alerts also fan out to a generic webhook, Slack, and email. Actual external delivery remains environment-specific until valid approved endpoints and credentials are supplied and tested; no secret or live destination is committed. The retained [`notification_routing_verification.json`](artifacts/monitoring/notification_routing_verification.json) records the successful internal smoke delivery and explicitly marks external delivery as unverified.
 
 ### 10. Data drift and model-health monitoring
 
@@ -345,14 +356,14 @@ Apply promotion guardrails
     ├── PROMOTE CANDIDATE ─┐
     └── KEEP BASELINE ─────┤ both are governed outcomes
                            ↓
-4 real saved-artifact API integration tests
+16 integration tests: 4 saved-artifact API + 12 dependency/documentation/notification contracts
     ↓
 Docker build and API smoke test
     ↓
 Release-readiness summary (no external deployment)
 ```
 
-The workflow uploads quality, coverage, training, serving, and evaluation artifacts between jobs. It verifies that the comparison decision, process exit status, champion type, and selected model path agree. It references the four existing integration tests rather than a missing placeholder suite.
+The workflow uploads quality, coverage, training, serving, and evaluation artifacts between jobs. It verifies that the comparison decision, process exit status, champion type, and selected model path agree. It runs all 16 existing integration tests rather than referencing a missing placeholder suite.
 
 **Verification boundary:** all tests and Docker/monitoring checks described below were executed locally. A successful GitHub-hosted Actions run URL has not yet been retained, so hosted CI execution must not be represented as verified. The Linux CI dependency installation must also succeed with the TensorFlow 2.13 compatibility constraints before release readiness is claimed.
 
@@ -365,10 +376,11 @@ The workflow uploads quality, coverage, training, serving, and evaluation artifa
 | Test group | Passed | Failed |
 |---|---:|---:|
 | Unit | 100 | 0 |
-| Saved-artifact integration | 4 | 0 |
-| **Total** | **104** | **0** |
+| Saved-artifact API integration | 4 | 0 |
+| Dependency, documentation, and notification contracts | 12 | 0 |
+| **Total** | **116** | **0** |
 
-Source coverage is **69%**. The integration suite starts the real FastAPI lifespan and verifies:
+Source coverage is **69%**. Four of the 16 integration tests start the real FastAPI lifespan and verify:
 
 1. every champion-serving artifact exists;
 2. `/health` reports the loaded champion;
@@ -519,7 +531,7 @@ enterprise-mlops-churn-prediction/
 ├── monitoring/                     # Prometheus rules and Grafana provisioning
 ├── docker/                         # API image and multi-service Compose stack
 ├── tests/unit/                     # 100 unit tests
-├── tests/integration/              # 4 real saved-artifact API tests
+├── tests/integration/              # 16 cross-component integration contracts
 ├── scripts/                        # Benchmark, monitoring verifier, report builder
 ├── webapp/                         # Optional Streamlit prototype
 ├── docs/                           # Architecture, design, provenance, alignment
@@ -534,7 +546,7 @@ The `.gitignore` still excludes bulk/generated training data, prediction outputs
 This is a verified mini-production system, not a claim of a fully managed cloud platform. The remaining technical boundaries are explicit:
 
 1. **Hosted CI:** retain a successful GitHub Actions run and resolve any Linux TensorFlow dependency constraints surfaced by the hosted runner.
-2. **Notifications:** add Alertmanager and a credential-managed receiver only when a real notification destination is selected.
+2. **External notification verification:** supply approved webhook/Slack/email credentials and retain delivery evidence; the internal Alertmanager audit route and secret-managed external template are implemented.
 3. **Authentication and network controls:** replace permissive development CORS and protect API, Prometheus, Grafana, and MLflow before shared or internet-facing deployment.
 4. **Delayed-label monitoring:** automate recent AUC, recall, calibration, and campaign-outcome collection once production labels exist.
 5. **Feature evolution:** replace simple category mappings with an explicit unknown-category policy before accepting unconstrained production categories.

@@ -65,6 +65,56 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      alertmanager:
+        condition: service_healthy
+    networks:
+      - mlops-network
+
+  # Alertmanager routes every alert to an internal audit sink. Set
+  # ALERTMANAGER_CONFIG_FILE to the external template after provisioning its
+  # secret files to fan out the same alert to Slack, email, and a webhook.
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ${ALERTMANAGER_CONFIG_FILE:-../monitoring/alertmanager/alertmanager.yml}:/etc/alertmanager/alertmanager.yml:ro
+      - ../monitoring/alertmanager/secrets:/run/secrets:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      notification-sink:
+        condition: service_healthy
+    networks:
+      - mlops-network
+
+  # Repository-local receiver representing an internal incident/audit system.
+  # It is network-internal and persists received Alertmanager payloads as JSONL.
+  notification-sink:
+    image: python:3.9-slim
+    container_name: churn-notification-sink
+    command: ["python", "/app/notification_sink.py"]
+    environment:
+      - NOTIFICATION_LOG_PATH=/data/notifications.jsonl
+      - NOTIFICATION_PORT=8080
+    volumes:
+      - ../monitoring/notification_sink.py:/app/notification_sink.py:ro
+      - notification-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
     networks:
       - mlops-network
 
@@ -106,3 +156,5 @@ networks:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
+  notification-data:

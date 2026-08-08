@@ -1,10 +1,10 @@
 {
   "verification_date": "2026-08-08",
-  "tests_collected": 104,
-  "tests_passed": 104,
+  "tests_collected": 116,
+  "tests_passed": 116,
   "tests_failed": 0,
   "unit_tests": 100,
-  "integration_tests": 4,
+  "integration_tests": 16,
   "source_coverage_percent": 69,
   "commands": [
     "python -m pytest tests/unit -q --cov=src --cov-report=term --cov-report=xml",

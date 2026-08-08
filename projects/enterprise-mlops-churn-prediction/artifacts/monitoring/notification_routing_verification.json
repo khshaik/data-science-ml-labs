@@ -1,0 +1,32 @@
+{
+  "verification_date": "2026-08-08",
+  "alertmanager_image": "prom/alertmanager:v0.28.1",
+  "compose_config_valid": true,
+  "config_validation": {
+    "internal_config": "passed_amtool_check_config",
+    "external_template": "passed_amtool_check_config_with_placeholder_secret_files"
+  },
+  "internal_delivery": {
+    "verified": true,
+    "alert_name": "NotificationRoutingSmokeTest",
+    "submitted_to": "Alertmanager /api/v2/alerts",
+    "receiver": "internal-audit",
+    "persisted_records": 1,
+    "persisted_status": "firing"
+  },
+  "external_delivery": {
+    "verified": false,
+    "reason": "credentials_not_supplied",
+    "configured_channels": [
+      "generic_webhook",
+      "slack",
+      "email"
+    ],
+    "credential_source": "Git-ignored files mounted read-only under /run/secrets"
+  },
+  "cleanup": {
+    "temporary_containers_removed": true,
+    "temporary_volumes_removed": true,
+    "placeholder_secret_files_removed": true
+  }
+}

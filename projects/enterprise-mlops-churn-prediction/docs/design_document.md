@@ -142,6 +142,11 @@ class FeatureEngineer:
 - **Measured Validation Performance**: AUC 0.8300, Recall 0.7674
 - **Trade-off**: Higher complexity without a validation improvement in this run
 
+**Governed Selection Outcome**
+- **Champion**: `baseline_v1.0.0` (balanced Logistic Regression)
+- **Decision**: `KEEP BASELINE`; the TensorFlow candidate's validation AUC was 0.0054 below the baseline
+- **Serving Contract**: `models/current_best.json` is the authoritative manifest used by online and batch inference
+
 ### 3.2 Evaluation Strategy
 
 **Data Split**: 60% train, 20% validation, 20% test (stratified by churn)
@@ -406,10 +411,16 @@ Decision: DRIFT DETECTED
 - ROI metrics
 
 **Alert Configuration** (Prometheus):
-- High error rate: > 0.05 errors/sec for 5 min
+- High error rate: error/request ratio > 5% for 5 min
 - High latency: p95 > 200ms for 5 min
 - API down: No response for 1 min
 - Drift detected: PSI > 0.2 for any key feature
+
+**Notification Routing** (Alertmanager):
+- Prometheus forwards firing and resolved alerts to the Compose-managed Alertmanager
+- Default route delivers to a network-internal audit receiver and persists JSONL evidence
+- Credential-enabled route continues internal delivery while also fanning out to an external webhook, Slack, and email
+- External endpoints and credentials are mounted from Git-ignored files; real external delivery must be verified in the target environment
 
 ---
 
@@ -433,9 +444,9 @@ Decision: DRIFT DETECTED
 - **Decision**: Hybrid approach (both patterns for different use cases)
 
 **Model Complexity vs Explainability**:
-- Neural Network: Better performance but less interpretable
-- Logistic Regression: Explainable but lower accuracy
-- **Decision**: Use Neural Network + SHAP/LIME for explanations
+- Neural Network: Higher capacity but slightly lower verified validation AUC and recall, with greater serving complexity
+- Logistic Regression: Stronger verified validation metrics, lower runtime complexity, and a directly interpretable decision boundary
+- **Decision**: Retain `baseline_v1.0.0` (Logistic Regression) as the governed champion; optional SHAP/LIME prototypes do not override measured promotion guardrails
 
 ### 7.2 Limitations
 
@@ -488,7 +499,7 @@ Decision: DRIFT DETECTED
 
 **Detection**:
 1. **Data Quality Check** detects non-numeric values in MonthlyCharges
-2. **Alert** sent to on-call engineer (Slack/email)
+2. **Alert** retained by the internal audit receiver and sent to on-call Slack/email when the credential-enabled external route is active
 3. **Ingestion** rejected, no corrupt data enters system
 4. **Monitoring** shows zero new predictions (throughput drop)
 
@@ -527,7 +538,7 @@ This mini production ML system is a production-oriented prototype demonstrating:
 - Training-serving consistency (shared feature engineering)
 - Automated quality gates (data validation, model promotion)
 - Comprehensive monitoring (3-layer: infra, data, model)
-- Modular code with 96 passing unit tests and 69% source coverage
+- Modular code with 100 unit tests passing, 16 integration tests passing, and 69% source coverage
 
 This system is suitable as a mini production ML prototype; cloud deployment and production hardening remain future work.
 

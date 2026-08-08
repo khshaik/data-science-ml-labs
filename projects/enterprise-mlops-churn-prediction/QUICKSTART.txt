@@ -5,7 +5,7 @@ ENTERPRISE MLOPS CHURN PREDICTION - VERIFIED QUICK START
 STATUS: Core assignment workflow implemented and verified locally on 08 Aug 2026
 CHAMPION: baseline_v1.0.0 (balanced Logistic Regression)
 CANDIDATE: TensorFlow 2.13 neural network [64, 32, 16]
-TESTS: 100 unit + 4 saved-artifact integration tests passed
+TESTS: 100 unit + 16 integration tests passed (116 total)
 SUBMISSION: 6-page, 1,523-word PDF with architecture and evidence panels
 
 Status vocabulary used below:
@@ -242,17 +242,19 @@ Run the verified unit suite:
     --cov-report=xml
 
 Verified result:
-  96 passed
+  100 passed
   0 failed
   69% source coverage
 
-Run the real saved-artifact API integration suite:
+Run the complete integration suite:
 
   python -m pytest tests/integration -q
 
 Verified result:
-  4 passed
-  Real champion, preprocessor, threshold, /health, /predict, and /metrics tested
+  16 passed
+  4 saved-artifact API tests cover the real champion, preprocessor, threshold,
+  /health, /predict, and /metrics. The other 12 enforce dependency, governed
+  documentation, and Alertmanager routing/receiver contracts.
 
 Test artifacts:
   coverage.xml
@@ -311,7 +313,7 @@ Prometheus UI             VERIFIED     API target up; 4 mounted alert rules load
 Grafana                    VERIFIED     Datasource and churn dashboard provisioned
 Streamlit                  PROTOTYPE    App exists; not execution-verified
 SHAP/LIME                  PROTOTYPE    Module/tests exist; live endpoint not verified
-GitHub Actions CI          IMPLEMENTED  Artifact flow and 4 integration tests fixed;
+GitHub Actions CI          IMPLEMENTED  Artifact flow and 16 integration tests fixed;
                                         hosted workflow run not yet retained
 
 Configured prototype URLs when their services are running:
@@ -319,8 +321,27 @@ Configured prototype URLs when their services are running:
   Prometheus   http://127.0.0.1:9090
   Grafana      http://127.0.0.1:3000
 
+Notification routing:
+  Internal delivery is enabled by default. Alertmanager sends firing and resolved
+  alerts to the network-internal audit receiver, which stores JSONL records in the
+  notification-data volume. Alertmanager UI is available at http://127.0.0.1:9093.
+
+  To enable simultaneous internal + external webhook + Slack + email delivery:
+  1. Copy monitoring/alertmanager/alertmanager.external.example.yml to
+     monitoring/alertmanager/alertmanager.local.yml.
+  2. Replace smtp.example.com, sender, recipient, and Slack channel values.
+  3. Create these untracked files under monitoring/alertmanager/secrets/:
+       external_webhook_url
+       slack_webhook_url
+       smtp_password
+  4. Start Compose with:
+       ALERTMANAGER_CONFIG_FILE=../monitoring/alertmanager/alertmanager.local.yml \
+         docker compose -f docker/docker-compose.yml up -d
+
+  Never commit alertmanager.local.yml or files under the secrets directory.
+
 Known optional hardening work:
-  1. Add Alertmanager routing only if external notifications are required.
+  1. Verify real external delivery after approved destination credentials are supplied.
   2. Run the repository-root GitHub Actions workflow and retain its successful
      hosted-run URL as execution evidence.
   3. Automate delayed-label AUC/recall and campaign-ROI collection.

@@ -246,6 +246,10 @@ lerna-debug.log*
 # Prometheus data
 prometheus_data/
 grafana_data/
+monitoring/alertmanager/alertmanager.local.yml
+!monitoring/alertmanager/secrets/
+monitoring/alertmanager/secrets/*
+!monitoring/alertmanager/secrets/.gitkeep
 
 # ============================================
 # Documentation (Keep essential docs)

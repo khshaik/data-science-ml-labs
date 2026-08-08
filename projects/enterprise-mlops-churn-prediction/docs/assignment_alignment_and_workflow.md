@@ -13,7 +13,7 @@ The major distinction is between **core rubric completion** and **optional/proto
 
 - Core rubric paths have been executed or directly verified: model training, evaluation, champion selection, API inference, batch scoring, benchmarking, drift detection, retraining-trigger scenarios, and unit tests.
 - MLflow's tracking backend and two finished runs are verified; its browser UI is available when the local UI command is started.
-- The Docker API plus Prometheus/Grafana path is locally verified with retained evidence. Streamlit, `/explain`, the MLflow Compose service, external alert delivery, and cloud deployment remain outside that verification boundary. The repository-root CI workflow is locally validated, but a hosted GitHub Actions run is not yet retained.
+- The Docker API plus Prometheus/Grafana path is locally verified with retained evidence. Alertmanager now has a default internal audit receiver and a secret-managed external webhook/Slack/email template; real external delivery remains outside the verification boundary until approved credentials are supplied. Streamlit, `/explain`, the MLflow Compose service, and cloud deployment also remain outside that boundary. The repository-root CI workflow is locally validated, but a hosted GitHub Actions run is not yet retained.
 - The retraining component decides and logs whether retraining is needed. It does not invoke training automatically and is not connected to a scheduler. This still meets the assignment, which explicitly permits pseudocode or a short unwired function.
 
 ## 2. Rubric cross-verification: what was asked and what is complete
@@ -23,7 +23,7 @@ The major distinction is between **core rubric completion** and **optional/proto
 | 1. Problem Understanding & Data (4) | Use case, target, inputs, dataset, intended use, sound train/validation/test split | Binary telco churn use case; 7,043 rows and 21 raw columns; target `Churn`; intended real-time agent and monthly campaign use cases; stratified raw 60/20/20 split before fitting learned transformations; customer ID excluded from modeling | **Core complete.** A chronological split is not possible because this public snapshot has no event timestamp. State this explicitly rather than implying date boundaries exist. |
 | 2. Model Development & Correctness (4) | Appropriate preprocessing/model choice, correct implementation, metrics suited to problem | Shared cleaning/encoding/scaling; baseline balanced Logistic Regression; **TensorFlow** candidate `[64,32,16]` with dropout, early stopping, LR reduction, deterministic seeds, and balanced class weights; AUC, recall, precision, F1, accuracy and confusion matrix; validation selects the champion and test is kept as final evidence | **Core complete.** Candidate remains TensorFlow 2.13; it was not replaced by `sklearn` MLP. A future enhancement is one-hot encoding for nominal categories and a documented small tuning search. |
 | 3. Production System Design & Implementation (4) | Clear end-to-end inference workflow via API, batch, or app; Docker not required | FastAPI `/predict`, `/health`, `/metrics`, optional `/explain`; batch scorer; champion manifest used by both paths; shared artifacts; clean-built Docker API and retained monitoring verification | **Core complete.** Local container path verified; Streamlit, cloud deployment, and the MLflow Compose service remain outside the evidence boundary. |
-| 4. Evaluation & Production Considerations (4) | Suitable metrics, imbalance handling, plus latency/throughput/monitoring/reliability | Balanced training, promotion guardrails, benchmark, batch throughput, verified Prometheus/Grafana wiring, JSON quality/drift checks, retraining signals, incident response and rollback | **Core complete.** External notifications and delayed-label model/business KPI automation remain future hardening. |
+| 4. Evaluation & Production Considerations (4) | Suitable metrics, imbalance handling, plus latency/throughput/monitoring/reliability | Balanced training, promotion guardrails, benchmark, batch throughput, verified Prometheus/Grafana wiring, internal Alertmanager audit delivery, secret-managed external routing template, JSON quality/drift checks, retraining signals, incident response and rollback | **Core complete.** Real external delivery verification and delayed-label model/business KPI automation remain future hardening. |
 | 5. Documentation & Presentation (4) | Clear report covering approach, architecture, implementation, results, decisions, and repository link | Six-page, 1,523-word consolidated PDF; clickable repository link; architecture image; four evidence panels; README, quick start, design document and this audit | **Complete, with minor cleanup advised.** Keep optional hosted-CI and cloud-deployment claims qualified until retained execution evidence exists. |
 
 This is an evidence-based readiness assessment, not a prediction of the instructor's exact mark.
@@ -108,7 +108,7 @@ The existing project-local environment was reused; no replacement ML framework w
 ./venv/bin/python -m pytest tests/unit -q --cov=src --cov-report=term --cov-report=xml
 ```
 
-Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **100/100 unit and 4/4 integration passed**, source coverage **69%**.
+Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **100/100 unit and 16/16 integration passed (116 total)**, source coverage **69%**.
 
 The API was also verified in process with FastAPI's `TestClient`, including application startup and artifact loading:
 
@@ -215,8 +215,9 @@ python scripts/build_submission_pdf.py
 | `docker/Dockerfile.api`, `docker/docker-compose.yml` | Clean-built API and health-gated API/Prometheus/Grafana monitoring path; MLflow service separately configured |
 | `monitoring/prometheus.yml`, `monitoring/alerts.yml` | Scrape and alert-rule definitions |
 | `monitoring/grafana/dashboards/model_performance.json` | Optional dashboard definition |
-| `tests/unit/*.py` | 96 tests across data, features, models, evaluation, serving, drift, explanation and retraining |
-| `../../.github/workflows/enterprise-mlops-churn-ci.yml` | Discoverable repository-root CI workflow with data quality, 100 unit tests, TensorFlow training, governed selection, four saved-artifact integration tests, Docker smoke test, and release summary; hosted run pending |
+| `tests/unit/*.py` | 100 tests across data, features, models, evaluation, serving, drift, explanation and retraining |
+| `tests/integration/*.py` | 16 tests: four real saved-artifact API checks plus 12 dependency, governed-documentation, and notification-routing contracts |
+| `../../.github/workflows/enterprise-mlops-churn-ci.yml` | Discoverable repository-root CI workflow with data quality, 100 unit tests, TensorFlow training, governed selection, all 16 integration tests, Docker smoke test, and release summary; hosted run pending |
 
 ### Generated evidence and deployable artifacts
 
@@ -365,12 +366,12 @@ sequenceDiagram
 
 ## 10. Necessary improvements, ordered by value
 
-1. **Enable external notification delivery only if required.** Add Alertmanager plus a governed email/webhook destination and secret handling; local Prometheus rule evaluation is already verified.
+1. **Verify external notification delivery.** Alertmanager, internal audit delivery, and the secret-managed webhook/Slack/email template are implemented; supply approved credentials and retain target-environment delivery evidence.
 2. **Fix Compose/README consistency.** The Compose file has no Streamlit service; the verified container boundary is API/Prometheus/Grafana, while MLflow remains separately configured.
 3. **Retain hosted CI evidence.** Run the implemented repository-root workflow on GitHub-hosted infrastructure and retain its successful run URL.
 4. **Automate delayed-label evaluation.** Join predictions to later outcomes, calculate windowed AUC/recall and campaign ROI, and feed the results into the retraining trigger.
 5. **Wire scheduling only if bonus production hardening is desired.** The configured weekly cron is not an active scheduler. Add an orchestrator job that runs quality → drift → trigger → training/evaluation only after approval.
 6. **Improve nominal encoding.** Replace arbitrary integer mappings for nominal categories with a fitted one-hot encoder or an explicit production-safe alternative, preserving unknown-category behavior.
-7. **Qualify optional claims.** Treat SHAP/LIME, Streamlit, hosted CI, external alert delivery, and cloud deployment as unverified until each has retained evidence.
+7. **Qualify optional claims.** Treat SHAP/LIME, Streamlit, hosted CI, real external alert delivery, and cloud deployment as unverified until each has retained evidence.
 
 None of items 2–8 is required to demonstrate the core assignment's minimum functioning mini-production system; they improve evidence quality, bonus readiness and operational credibility.

@@ -45,7 +45,7 @@ No mandatory top-level component is absent. Representative ingestion and local m
 | A. Data & Features | **Complete** | Ingestion execution proof and exact dataset provenance/rights are retained. |
 | B. Training & Evaluation | **Complete** | Test coverage of the orchestration script is relatively low. |
 | C. Serving & Inference | **Complete** | Saved artifacts permit immediate champion loading after dependency setup. |
-| D. Monitoring & Retraining | **Complete for required scope** | Local dashboard/alert wiring is verified; external notification delivery and delayed-label KPI collection remain optional. |
+| D. Monitoring & Retraining | **Complete for required scope** | Local dashboard/rule wiring is verified; Alertmanager has internal audit delivery and a secret-managed external routing template. Real external delivery and delayed-label KPI collection remain environment-dependent. |
 | Code quality & reproducibility | **Complete for core** | Hosted execution evidence for the implemented optional CI workflow remains. |
 | Design & communication | **Complete** | A few claims in the long Markdown design document are older than the final PDF. |
 
@@ -61,14 +61,14 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 | DEL-02 | Training pipeline | **Complete** | `src/training/train.py` performs raw load, stratified split, feature creation, train-only preprocessing fit, training, validation/test evaluation, artifact saving, and MLflow logging. | Add a single end-to-end smoke test for the orchestration path. |
 | DEL-03 | Inference service | **Complete** | `src/serving/api.py` provides FastAPI `/predict`, `/health`, `/metrics`, and optional `/explain`; required saved artifacts are included in the Git handoff. | None required. |
 | DEL-04 | Batch or micro-batch ingestion | **Complete** | `src/data/ingestion.py` reads, validates, merges, deduplicates, and writes training data plus a timestamped JSON audit record. `artifacts/logs/ingestion_20260808_082509.json` retains a successful 7,043-row end-to-end reproducibility replay. | The replay uses the authoritative repository dataset and is explicitly not represented as newly arrived production data. |
-| DEL-05 | Basic tests and configs | **Complete** | 100 unit tests, four saved-artifact integration tests, `config/config.yaml`, `config/feature_config.yaml`, and `pytest.ini`. | Retain a successful hosted CI run URL. |
+| DEL-05 | Basic tests and configs | **Complete** | 100 unit tests, 16 integration tests (including four real saved-artifact API checks), `config/config.yaml`, `config/feature_config.yaml`, and `pytest.ini`. | Retain a successful hosted CI run URL. |
 | DEL-06 | Design document: 4-6 pages or about 1,500-2,000 words | **Complete** | `output/pdf/enterprise_mlops_churn_submission.pdf` is exactly 6 A4 pages and 1,523 extracted words. All pages were rendered and visually checked. | None required. |
 | DEL-07 | Problem definition and metrics | **Complete** | PDF page 1 defines target, operational decision, recall objective, AUC guardrail, and latency goal. | Optional: add an explicit cost-based threshold-selection calculation. |
 | DEL-08 | Data and feature design | **Complete** | PDF page 3, `config/feature_config.yaml`, and `docs/dataset_provenance_and_license.md` describe the exact IBM sample lineage, rights label, integrity digest, assumptions, six features, availability, and skew controls. | None required. |
 | DEL-09 | Model choice and evaluation | **Complete** | PDF page 4 and committed compact `artifacts/eval/*` reports compare Logistic Regression and TensorFlow NN using validation and untouched test results. | None required. |
 | DEL-10 | Serving and inference pattern | **Complete** | PDF pages 2 and 5 explain online plus batch paths, users, latency, and throughput. | None required. |
 | DEL-11 | Data pipeline and retraining strategy | **Complete** | PDF pages 2, 3, and 6 plus ingestion and retraining modules. | Scheduling remains external, which is allowed by the brief and is correctly disclosed. |
-| DEL-12 | Monitoring plan and basic alerts | **Complete; locally verified** | PDF page 6, API metrics, DQ/drift code, four mounted Prometheus rules, provisioned Grafana datasource/dashboard, and `artifacts/monitoring/stack_verification.json`. | External Alertmanager notification routing is intentionally excluded. |
+| DEL-12 | Monitoring plan and basic alerts | **Complete; locally verified** | PDF page 6, API metrics, DQ/drift code, four mounted Prometheus rules, provisioned Grafana datasource/dashboard, Alertmanager internal audit routing, and a secret-managed external webhook/Slack/email template. | Retain real external delivery evidence after approved credentials are supplied. |
 | DEL-13 | Trade-offs, limitations, future work | **Complete** | PDF page 6 and `docs/design_document.md` cover model complexity, recall/precision, hybrid inference, limitations, and next work. | Align older Markdown wording with final measured model results. |
 | DEL-14 | Architecture diagram as one image | **Complete** | `docs/architecture_diagram.svg` and PDF page 2 show source, ingestion/DQ, features/prep, training, champion, online/batch serving, observation, and retraining loop. | Optional registry is represented by the champion manifest rather than a full registry, which is acceptable. |
 
@@ -143,7 +143,7 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 | D-06 | Basic drift signals | **Complete** | PSI and KS for continuous fields, chi-squared for categorical fields, saved report and warning behavior. | Current demo compares two partitions of one historical dataset; add a realistic “recent batch” fixture for stronger evidence. |
 | D-07 | Model metric on labeled feedback | **Complete as plan** | Weekly AUC/recall and threshold alerts are documented. | No delayed-label join or automated calculation exists; correctly treated as future work. |
 | D-08 | Business KPI | **Complete as plan** | Actual churn and retention-campaign ROI are documented. | No automated campaign outcome feed; correctly disclosed. |
-| D-09 | Dashboards and alerts | **Complete; locally verified** | Prometheus loaded four mounted rules; Grafana provisioned the Prometheus datasource and churn dashboard; live APIs returned HTTP 200. | No external notification destination is configured. |
+| D-09 | Dashboards and alerts | **Complete; locally verified** | Prometheus loaded four mounted rules; Grafana provisioned the datasource/dashboard; Alertmanager routes to an internal audit sink and can fan out to credential-managed webhook, Slack, and email channels. | Real external destinations are intentionally uncommitted and still require target-environment delivery verification. |
 | D-10 | State dashboard/alert audience | **Complete** | Engineers, data scientists, and business stakeholders have distinct views and signals. | None. |
 | D-11 | Implement lightweight drift or quality check | **Complete** | Both data-quality checks and statistical drift checks are implemented and tested. | Exceeds the minimum. |
 | D-12 | Log warning on drift/quality issue | **Complete** | Both modules log pass/warning/failure outcomes and save JSON. | None. |
@@ -161,11 +161,11 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 | QR-01 | Modular code structure | **Complete** | Separate data, features, models, training, serving, monitoring, and retraining packages. | None. |
 | QR-02 | Configuration-driven behavior | **Complete** | Split ratios, thresholds, paths, model settings, and serving settings are in YAML. | Some file paths remain hard-coded in feature/API code; centralize them if polishing. |
 | QR-03 | Dependency reproducibility | **Complete in current environment; portability risk** | Versions are pinned and the existing Python 3.9.6 environment executes TensorFlow 2.13 successfully. | A clean install was not performed. TensorFlow wheels vary by OS/CPU; document supported platform and Python version. |
-| QR-04 | Tests | **Complete** | Fresh unit run: 96 passed, 0 failed. Fresh saved-artifact integration run: 4 passed, exercising real startup, champion prediction, health, and metrics. | Retain the first successful hosted CI run as external execution evidence. |
+| QR-04 | Tests | **Complete** | Fresh run: 100 unit and 16 integration tests passed, 0 failed. The integration suite includes four real startup/champion/API checks and 12 dependency/documentation/notification contracts. | Retain the first successful hosted CI run as external execution evidence. |
 | QR-05 | Coverage | **Adequate; improvement recommended** | Fresh source coverage is 69%; drift and retraining are high, while `train.py` is 31%. | Add orchestration error-path and end-to-end training smoke tests. |
 | QR-06 | Fresh-checkout usability | **Complete after dependency setup** | Dataset, models, preprocessor, feature threshold, evaluation reports, configs, PDF, MLflow DB, benchmark evidence, and champion manifest are included. Champion loading was verified from an export of the Git index. | A clean dependency installation remains platform-sensitive because TensorFlow wheels vary by OS/CPU. |
 | QR-07 | Documentation consistency | **Complete for the runbook** | `QUICKSTART.txt` now provides a saved-artifact fast path, full reproduction path, verified results, provenance note, evaluation exit-code behavior, explicit automation boundaries, and a prototype-status table. | Keep figures and statuses synchronized after future executions. |
-| QR-08 | CI (optional) | **Implemented; hosted run pending** | A discoverable repository-root workflow passes artifacts between jobs, accepts either governed promotion outcome, runs 100 unit tests plus four real saved-artifact integration tests, smoke-tests the Docker image, and emits a non-deployment release summary. | Run it on GitHub-hosted infrastructure and retain the successful run URL before claiming hosted CI verification. |
+| QR-08 | CI (optional) | **Implemented; hosted run pending** | A discoverable repository-root workflow passes artifacts between jobs, accepts either governed promotion outcome, runs 100 unit tests plus all 16 integration tests, smoke-tests the Docker image, and emits a non-deployment release summary. | Run it on GitHub-hosted infrastructure and retain the successful run URL before claiming hosted CI verification. |
 
 ## 9. Design document and communication (1/28)
 
@@ -185,9 +185,9 @@ These items are useful but are not required by the attached assignment brief.
 | Component | Status | Evidence | Required improvement before claiming completion |
 |---|---|---|---|
 | Docker API image | **Prototype** | `docker/Dockerfile.api` | Build and health-test from a clean checkout. |
-| Docker Compose stack | **Partially verified** | API/Prometheus/Grafana subset clean-built and health-gated | Verify MLflow service separately if claiming the complete four-service stack. |
+| Docker Compose stack | **Partially verified** | API/Prometheus/Grafana path and Alertmanager/internal-sink path were each exercised locally | Verify MLflow separately and rerun all services together before claiming the complete stack as one deployment. |
 | MLflow | **Locally verified** | Tracked `mlflow.db` with two finished runs | Confirm DB/artifact links work after cloning elsewhere. |
-| Prometheus | **Locally verified** | API target up, request metric scraped, four rules loaded, `promtool` passed | Add Alertmanager only if notification delivery is required. |
+| Prometheus / Alertmanager | **Prometheus verified; notification routing implemented** | API target up, request metric scraped, four rules loaded, internal audit receiver configured, external webhook/Slack/email template uses file-backed secrets | Retain external delivery evidence after approved credentials are supplied. |
 | Grafana | **Locally verified** | Prometheus datasource and churn dashboard provisioned; health/database APIs passed | Use production authentication and persistence controls for non-local deployment. |
 | Streamlit | **Prototype** | `webapp/app.py` | Run and test; either add to Compose or keep documented as separate. |
 | SHAP/LIME explanation | **Prototype / unit-tested** | explainer module and optional API endpoint | Execute `/explain` with the champion and retain response evidence. |
@@ -210,7 +210,7 @@ None currently identified. The retained ingestion record is explicitly labelled 
 
 ### P2 - optional production extensions
 
-8. Add an external Alertmanager destination only if notification delivery is required.
+8. Supply approved external Alertmanager destinations and retain webhook/Slack/email delivery evidence.
 9. Retain the implemented request-based error-ratio alert semantics.
 10. Run the repaired GitHub Actions workflow on a hosted runner and retain the successful run URL.
 11. Add delayed-label joins and scheduled AUC/recall computation plus retention-campaign outcome/ROI ingestion.
