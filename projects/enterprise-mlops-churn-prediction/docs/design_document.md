@@ -109,6 +109,15 @@ class FeatureEngineer:
 - Feature threshold saved during training, loaded during serving
 - Continuous monitoring of feature distributions
 
+**Categorical encoding boundary**: The retained preprocessing artifact uses a
+training-fitted `LabelEncoder` integer column for each categorical input; it is
+not one-hot encoding. During serving, unseen multi-class values map to the
+encoder's first known class, while unseen binary values remain strict and
+raise. Replacing this compatibility behavior with one-hot encoding or a
+dedicated unknown sentinel would change the 25-column model contract and must
+be accompanied by full retraining, evaluation, artifact replacement, and
+renewed online/batch parity verification.
+
 ### 2.4 Data Pipeline
 
 **Batch Ingestion** (`src/data/ingestion.py`):
@@ -273,7 +282,9 @@ GET  /metrics      - Prometheus metrics
 1. CRM system exports daily CSV to `data/incoming/`
 2. Ingestion script validates quality
 3. Merge with existing training data
-4. Deduplicate by customerID (keep most recent)
+4. Deduplicate by customerID using ingestion order: existing rows first,
+   incoming rows second, and the last row wins. The source has no event/update
+   timestamp, so this is not an event-time recency guarantee.
 5. Log ingestion stats
 
 **Quality Gates**:
@@ -538,7 +549,7 @@ This mini production ML system is a production-oriented prototype demonstrating:
 - Training-serving consistency (shared feature engineering)
 - Automated quality gates (data validation, model promotion)
 - Comprehensive monitoring (3-layer: infra, data, model)
-- Modular code with 100 unit tests passing, 16 integration tests passing, and 69% source coverage
+- Modular code with 100 unit tests passing, 17 integration tests passing, and 69% source coverage
 
 This system is suitable as a mini production ML prototype; cloud deployment and production hardening remain future work.
 

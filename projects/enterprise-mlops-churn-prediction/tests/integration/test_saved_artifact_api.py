@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -64,3 +66,41 @@ def test_metrics_include_prediction_observability(saved_artifact_client):
     assert response.headers["content-type"].startswith("text/plain")
     assert "predictions_total" in response.text
     assert "prediction_latency_seconds" in response.text
+
+
+def test_offline_batch_and_online_api_transform_identical_final_vector(
+    saved_artifact_client, sample_request
+):
+    """The offline batch and online API paths must produce one identical vector."""
+    from src.serving import api as api_module
+    from src.serving.batch_predict import BatchPredictor
+
+    # Load an independent retained bundle through the offline batch entry
+    # point. The online API bundle was loaded by the FastAPI lifespan.
+    batch_predictor = BatchPredictor()
+    batch_predictor.load_model()
+
+    raw_row = pd.DataFrame([sample_request])
+
+    online_vector = api_module.feature_engineer.create_features(
+        raw_row.copy(), mode="online"
+    )
+    online_vector = api_module.preprocessor.preprocess_for_serving(online_vector)
+    online_vector = online_vector[api_module.preprocessor.feature_names]
+
+    offline_vector = batch_predictor.feature_engineer.create_features(
+        raw_row.copy(), mode="online"
+    )
+    offline_vector = batch_predictor.preprocessor.preprocess_for_serving(offline_vector)
+    offline_vector = offline_vector[batch_predictor.preprocessor.feature_names]
+
+    assert batch_predictor.feature_engineer is not api_module.feature_engineer
+    assert batch_predictor.preprocessor is not api_module.preprocessor
+    assert list(offline_vector.columns) == list(online_vector.columns)
+    assert offline_vector.shape == online_vector.shape == (1, 25)
+    np.testing.assert_allclose(
+        offline_vector.to_numpy(dtype=float),
+        online_vector.to_numpy(dtype=float),
+        rtol=0.0,
+        atol=1e-12,
+    )

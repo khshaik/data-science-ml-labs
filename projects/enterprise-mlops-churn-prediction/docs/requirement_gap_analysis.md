@@ -6,7 +6,7 @@
 
 **Audit date:** 08 August 2026
 
-**Repository state:** local `main` at `96f092e`, matching the locally known `origin/main`
+**Repository state:** audited working tree based on local `main` at `dae0856`; hosted repository state must be re-verified after the approved changes are committed and pushed
 
 **Purpose:** assess every stated deliverable and requirement against committed code, documentation, artifacts, and fresh execution evidence.
 
@@ -57,11 +57,11 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 
 | ID | Expected deliverable | Status | Evidence | Gap / improvement |
 |---|---|---|---|---|
-| DEL-01 | Code repository, zipped or linked | **Complete** | Project is committed under the linked `data-science-ml-labs` repository; local `main` matches `origin/main`. | Confirm the public link opens without authentication and shows commit `96f092e`. |
+| DEL-01 | Code repository, zipped or linked | **Complete locally; push verification pending** | The project resides in the linked `data-science-ml-labs` repository and the complete handoff is present in the audited working tree. | After commit and push, confirm the public link opens without authentication and displays the final commit and retained runtime artifacts. |
 | DEL-02 | Training pipeline | **Complete** | `src/training/train.py` performs raw load, stratified split, feature creation, train-only preprocessing fit, training, validation/test evaluation, artifact saving, and MLflow logging. | Add a single end-to-end smoke test for the orchestration path. |
 | DEL-03 | Inference service | **Complete** | `src/serving/api.py` provides FastAPI `/predict`, `/health`, `/metrics`, and optional `/explain`; required saved artifacts are included in the Git handoff. | None required. |
 | DEL-04 | Batch or micro-batch ingestion | **Complete** | `src/data/ingestion.py` reads, validates, merges, deduplicates, and writes training data plus a timestamped JSON audit record. `artifacts/logs/ingestion_20260808_082509.json` retains a successful 7,043-row end-to-end reproducibility replay. | The replay uses the authoritative repository dataset and is explicitly not represented as newly arrived production data. |
-| DEL-05 | Basic tests and configs | **Complete** | 100 unit tests, 16 integration tests (including four real saved-artifact API checks), `config/config.yaml`, `config/feature_config.yaml`, and `pytest.ini`. | Retain a successful hosted CI run URL. |
+| DEL-05 | Basic tests and configs | **Complete** | 100 unit tests, 17 integration tests (including five real saved-artifact serving checks), `config/config.yaml`, `config/feature_config.yaml`, and `pytest.ini`. | Retain a successful hosted CI run URL. |
 | DEL-06 | Design document: 4-6 pages or about 1,500-2,000 words | **Complete** | `output/pdf/enterprise_mlops_churn_submission.pdf` is exactly 6 A4 pages and 1,523 extracted words. All pages were rendered and visually checked. | None required. |
 | DEL-07 | Problem definition and metrics | **Complete** | PDF page 1 defines target, operational decision, recall objective, AUC guardrail, and latency goal. | Optional: add an explicit cost-based threshold-selection calculation. |
 | DEL-08 | Data and feature design | **Complete** | PDF page 3, `config/feature_config.yaml`, and `docs/dataset_provenance_and_license.md` describe the exact IBM sample lineage, rights label, integrity digest, assumptions, six features, availability, and skew controls. | None required. |
@@ -84,12 +84,12 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 | A-06 | At least five non-trivial features | **Complete** | Six features: average charge ratio, service count, tenure bin, payment risk, contract stability, high-value threshold. | `avg_monthly_charge` is better labelled a ratio than an aggregation. This is wording, not a functional gap. |
 | A-07 | Aggregations, ratios, encodings, windows, or similar | **Complete** | The set includes a ratio, count aggregation, binning, Boolean/domain encoding, ordinal mapping, and train-derived threshold. | No temporal window is possible with this cross-sectional dataset; not required because the brief gives examples, not a mandatory mix. |
 | A-08 | Document offline versus online features | **Complete** | Feature table marks all six as available offline and online and explains availability/skew control. | None. |
-| A-09 | Awareness of training-serving skew | **Complete** | Shared module, persisted p75 threshold, train-only fitted preprocessors, and consistency tests are documented. | Remove the feature engineer's fallback threshold of 70 or fail closed when the persisted threshold is missing; silent fallback could create skew. |
-| A-10 | Same feature logic in training and serving | **Complete** | Both training and serving call `FeatureEngineer`; both serving modes load the saved threshold and preprocessor. | Add one explicit golden-row test comparing the final transformed vector across offline and online paths. |
+| A-09 | Awareness of training-serving skew | **Complete** | Shared module, persisted p75 threshold, train-only fitted preprocessors, and consistency tests are documented. Online transformation fails closed when the threshold is unavailable. | None. |
+| A-10 | Same feature logic in training and serving | **Complete** | Both training and serving call `FeatureEngineer`; both serving modes load the saved threshold and preprocessor. A retained-artifact integration test proves offline batch and online API final-vector parity. | None. |
 | A-11 | Prevent leakage | **Complete** | Raw data is split 60/20/20 before fitting the percentile, label encoders, and scaler. Promotion uses validation, with test retained for final estimates. | Strong implementation; preserve this ordering. |
 | A-12 | Read new batch file(s) | **Complete** | CLI accepts input CSV and quality-checks it. | None. |
-| A-13 | Append or merge to training table/file | **Complete** | Existing and incoming rows are concatenated; duplicate `customerID`s keep the latest row. | Without an event/update timestamp, “latest” means file order. Document this assumption or add an update timestamp. |
-| A-14 | Log N rows and date | **Complete in code; evidence partial** | Summary includes timestamp, new, existing, total, and deduplicated counts and is written to JSON. | Execute one representative batch and retain its JSON proof. |
+| A-13 | Append or merge to training table/file | **Complete** | Existing rows precede incoming rows; duplicate `customerID`s retain the last row by ingestion order. The no-event-timestamp boundary is explicit in code, tests, and documentation. | A future timestamp contract is optional production hardening, not an assignment gap. |
+| A-14 | Log N rows and date | **Complete** | Summary includes timestamp, new, existing, total, deduplicated counts and the deduplication policy. `artifacts/logs/ingestion_20260808_082509.json` retains a representative successful replay. | None. |
 
 **Section A readiness:** approximately **6.5-7.0/7**. The only realistic grading deductions would be evidence retention or imprecise source attribution.
 
@@ -161,11 +161,11 @@ This is not a prediction of the instructor's exact mark. Based only on observabl
 | QR-01 | Modular code structure | **Complete** | Separate data, features, models, training, serving, monitoring, and retraining packages. | None. |
 | QR-02 | Configuration-driven behavior | **Complete** | Split ratios, thresholds, paths, model settings, and serving settings are in YAML. | Some file paths remain hard-coded in feature/API code; centralize them if polishing. |
 | QR-03 | Dependency reproducibility | **Complete in current environment; portability risk** | Versions are pinned and the existing Python 3.9.6 environment executes TensorFlow 2.13 successfully. | A clean install was not performed. TensorFlow wheels vary by OS/CPU; document supported platform and Python version. |
-| QR-04 | Tests | **Complete** | Fresh run: 100 unit and 16 integration tests passed, 0 failed. The integration suite includes four real startup/champion/API checks and 12 dependency/documentation/notification contracts. | Retain the first successful hosted CI run as external execution evidence. |
+| QR-04 | Tests | **Complete** | Fresh run: 100 unit and 17 integration tests passed, 0 failed. The integration suite includes five real startup/champion/serving checks and 12 dependency/documentation/notification contracts. | Retain the first successful hosted CI run as external execution evidence. |
 | QR-05 | Coverage | **Adequate; improvement recommended** | Fresh source coverage is 69%; drift and retraining are high, while `train.py` is 31%. | Add orchestration error-path and end-to-end training smoke tests. |
 | QR-06 | Fresh-checkout usability | **Complete after dependency setup** | Dataset, models, preprocessor, feature threshold, evaluation reports, configs, PDF, MLflow DB, benchmark evidence, and champion manifest are included. Champion loading was verified from an export of the Git index. | A clean dependency installation remains platform-sensitive because TensorFlow wheels vary by OS/CPU. |
 | QR-07 | Documentation consistency | **Complete for the runbook** | `QUICKSTART.txt` now provides a saved-artifact fast path, full reproduction path, verified results, provenance note, evaluation exit-code behavior, explicit automation boundaries, and a prototype-status table. | Keep figures and statuses synchronized after future executions. |
-| QR-08 | CI (optional) | **Implemented; hosted run pending** | A discoverable repository-root workflow passes artifacts between jobs, accepts either governed promotion outcome, runs 100 unit tests plus all 16 integration tests, smoke-tests the Docker image, and emits a non-deployment release summary. | Run it on GitHub-hosted infrastructure and retain the successful run URL before claiming hosted CI verification. |
+| QR-08 | CI (optional) | **Implemented; hosted run pending** | A discoverable repository-root workflow passes artifacts between jobs, accepts either governed promotion outcome, runs 100 unit tests plus all 17 integration tests, smoke-tests the Docker image, and emits a non-deployment release summary. | Run it on GitHub-hosted infrastructure and retain the successful run URL before claiming hosted CI verification. |
 
 ## 9. Design document and communication (1/28)
 
@@ -191,7 +191,7 @@ These items are useful but are not required by the attached assignment brief.
 | Grafana | **Locally verified** | Prometheus datasource and churn dashboard provisioned; health/database APIs passed | Use production authentication and persistence controls for non-local deployment. |
 | Streamlit | **Prototype** | `webapp/app.py` | Run and test; either add to Compose or keep documented as separate. |
 | SHAP/LIME explanation | **Prototype / unit-tested** | explainer module and optional API endpoint | Execute `/explain` with the champion and retain response evidence. |
-| CI/CD | **Implemented; locally validated** | Repository-root GitHub Actions workflow and four passing saved-artifact integration tests | Retain a successful hosted Actions run URL. |
+| CI/CD | **Implemented; locally validated** | Repository-root GitHub Actions workflow and five passing saved-artifact integration tests | Retain a successful hosted Actions run URL. |
 
 ## 11. Prioritized improvement backlog
 
@@ -201,20 +201,18 @@ None currently identified. The retained ingestion record is explicitly labelled 
 
 ### P1 - strengthen correctness and grading confidence
 
-2. **Add an end-to-end smoke test** covering load -> raw split -> train-only feature/preprocessor fit -> baseline training -> evaluation -> champion manifest -> API prediction.
-3. **Add a final-vector skew test** that feeds the same row through offline and online feature/preprocessing paths and asserts identical columns and values.
-4. **Fail closed on a missing high-value threshold** instead of silently using 70.0, or explicitly label the fallback as emergency-only and expose a health warning.
-5. **Improve categorical preprocessing.** Replace arbitrary `LabelEncoder` integers for nominal variables with fitted one-hot encoding or another explicit unknown-safe approach.
-6. **Clarify threshold economics.** State that 0.5 is a demonstration threshold and add an optional validation-only cost/recall threshold analysis.
-7. **Preserve dataset provenance.** Keep the source URLs, access date, rights statement, and checksum synchronized if the dataset file changes.
+1. **Add an end-to-end training-orchestration smoke test** covering load -> raw split -> train-only feature/preprocessor fit -> baseline training -> evaluation -> champion manifest -> API prediction.
+2. **Evaluate categorical preprocessing migration.** The current fitted integer mappings and their unseen-value behavior are explicit and tested. Any future one-hot or unknown-sentinel migration must include full retraining, evaluation, artifact replacement, and renewed serving-parity evidence.
+3. **Clarify threshold economics.** State that 0.5 is a demonstration threshold and add an optional validation-only cost/recall threshold analysis.
+4. **Preserve dataset provenance.** Keep the source URLs, access date, rights statement, and checksum synchronized if the dataset file changes.
 
 ### P2 - optional production extensions
 
-8. Supply approved external Alertmanager destinations and retain webhook/Slack/email delivery evidence.
-9. Retain the implemented request-based error-ratio alert semantics.
-10. Run the repaired GitHub Actions workflow on a hosted runner and retain the successful run URL.
-11. Add delayed-label joins and scheduled AUC/recall computation plus retention-campaign outcome/ROI ingestion.
-12. Add a stable update timestamp to ingestion deduplication and retain a data snapshot/version for rollback claims.
+5. Supply approved external Alertmanager destinations and retain webhook/Slack/email delivery evidence.
+6. Run the repaired GitHub Actions workflow on a hosted runner and retain the successful run URL.
+7. Add delayed-label joins and scheduled AUC/recall computation plus retention-campaign outcome/ROI ingestion.
+8. Activate recurring scheduling if the prototype is promoted beyond local demonstration.
+9. Add a stable source event/update timestamp and snapshot version if the upstream data contract evolves beyond ingestion-order semantics.
 
 ## 12. Final conclusion
 

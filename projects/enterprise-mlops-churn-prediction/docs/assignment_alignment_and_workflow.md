@@ -90,7 +90,7 @@ Measured results:
 | Row count, missing values, duplicates, wrong column types, dropped columns | Completed in the original notebook and quality/preprocessing modules. Row count is 7,043; `TotalCharges` type issue is handled; `customerID` is dropped from model features. |
 | Correlation matrix | Present in `notebooks/00_original_notebook.ipynb`. |
 | Univariate, bivariate and multivariate EDA | Present extensively in the original notebook, including categorical distributions, churn comparisons, numerical pair relationships and multivariate plots. The notebook retains outputs in 94 code cells, although execution counters are cleared. |
-| One-hot/label encoding | The original EDA notebook demonstrates encoding. The production pipeline currently uses fitted integer mappings for categorical inputs and label encoding for the target. One-hot encoding of nominal production features remains an acknowledged improvement. |
+| One-hot/label encoding | The original EDA notebook demonstrates encoding. The production pipeline uses training-fitted `LabelEncoder` integer mappings for categorical inputs and binary encoding for the target; it does not one-hot encode production inputs. Unseen multi-class values map to the first known class, while unseen binary values remain strict. Any migration requires full retraining and artifact replacement. |
 | Standardization | Implemented with a scaler fitted only to training data and reused for validation, test and serving. |
 | Target/features and feature evaluation | Completed through six production features, feature configuration and the original notebook's chi-square/importance analysis. |
 | Training/evaluation split | Completed as stratified 60/20/20 train/validation/test. |
@@ -108,7 +108,7 @@ The existing project-local environment was reused; no replacement ML framework w
 ./venv/bin/python -m pytest tests/unit -q --cov=src --cov-report=term --cov-report=xml
 ```
 
-Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **100/100 unit and 16/16 integration passed (116 total)**, source coverage **69%**.
+Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **100/100 unit and 17/17 integration passed (117 total)**, source coverage **69%**.
 
 The API was also verified in process with FastAPI's `TestClient`, including application startup and artifact loading:
 
@@ -216,8 +216,8 @@ python scripts/build_submission_pdf.py
 | `monitoring/prometheus.yml`, `monitoring/alerts.yml` | Scrape and alert-rule definitions |
 | `monitoring/grafana/dashboards/model_performance.json` | Optional dashboard definition |
 | `tests/unit/*.py` | 100 tests across data, features, models, evaluation, serving, drift, explanation and retraining |
-| `tests/integration/*.py` | 16 tests: four real saved-artifact API checks plus 12 dependency, governed-documentation, and notification-routing contracts |
-| `../../.github/workflows/enterprise-mlops-churn-ci.yml` | Discoverable repository-root CI workflow with data quality, 100 unit tests, TensorFlow training, governed selection, all 16 integration tests, Docker smoke test, and release summary; hosted run pending |
+| `tests/integration/*.py` | 17 tests: five real saved-artifact serving checks plus 12 dependency, governed-documentation, and notification-routing contracts |
+| `../../.github/workflows/enterprise-mlops-churn-ci.yml` | Discoverable repository-root CI workflow with data quality, 100 unit tests, TensorFlow training, governed selection, all 17 integration tests, Docker smoke test, and release summary; hosted run pending |
 
 ### Generated evidence and deployable artifacts
 
@@ -371,7 +371,7 @@ sequenceDiagram
 3. **Retain hosted CI evidence.** Run the implemented repository-root workflow on GitHub-hosted infrastructure and retain its successful run URL.
 4. **Automate delayed-label evaluation.** Join predictions to later outcomes, calculate windowed AUC/recall and campaign ROI, and feed the results into the retraining trigger.
 5. **Wire scheduling only if bonus production hardening is desired.** The configured weekly cron is not an active scheduler. Add an orchestrator job that runs quality → drift → trigger → training/evaluation only after approval.
-6. **Improve nominal encoding.** Replace arbitrary integer mappings for nominal categories with a fitted one-hot encoder or an explicit production-safe alternative, preserving unknown-category behavior.
+6. **Improve nominal encoding.** Replace the documented retained-model compatibility mapping with a fitted one-hot encoder or dedicated unknown sentinel, then retrain, evaluate, replace artifacts, and reverify API/batch parity.
 7. **Qualify optional claims.** Treat SHAP/LIME, Streamlit, hosted CI, real external alert delivery, and cloud deployment as unverified until each has retained evidence.
 
 None of items 2–8 is required to demonstrate the core assignment's minimum functioning mini-production system; they improve evidence quality, bonus readiness and operational credibility.

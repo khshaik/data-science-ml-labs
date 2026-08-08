@@ -336,7 +336,7 @@ def build():
         "Raw rows are stratified 60/20/20 before any data-derived feature is fitted. Encoders and scaler fit only on training rows.",
         "Quality gates cover schema, missing rates, numeric ranges, duplicate IDs, and logical consistency.",
         "The current batch passed blocking checks. Fifty-nine charge-history deviations are retained as a non-blocking warning because current monthly price need not equal historical average price.",
-        "Batch ingestion merges new CSV data, keeps the latest customer record, and writes a timestamped JSON audit summary.",
+        "Batch ingestion appends incoming rows after retained rows, keeps the last row by ingestion order for each customer ID, and writes a timestamped JSON audit summary.",
     ], 40, y)
     y = paragraph(c, "Offline and online availability is explicit. All six features can be calculated from request-time account fields. The only learned feature parameter is the high-value threshold; it is fitted on training rows, serialized, and loaded for both serving modes. This avoids recomputing a percentile from a single online request or a recent batch.", 40, y, 500, 8.3, 10.5)
     evidence_panel(c, 38, 62, W - 76, 103, "DATA QUALITY RUN", [
@@ -430,19 +430,19 @@ def build():
         "Metrics   GET http://127.0.0.1:8000/metrics                          -> verified",
         "Offline   python -m src.serving.batch_predict ... | python -m src.monitoring.drift_detector",
         "Lifecycle python -m src.retraining.trigger | python -m src.training.train --model candidate",
-        "Tests     pytest tests/unit -> 100 passed | pytest tests/integration -> 4 passed",
-        "Monitor   Prometheus :9090 | Grafana :3000 -> locally verified; notifications excluded",
+        "Tests     pytest tests/unit -> 100 passed | pytest tests/integration -> 17 passed",
+        "Monitor   Prometheus :9090 | Grafana :3000 | Alertmanager :9093 -> local paths verified",
     ])
     y -= 130
     y = section(c, "Alignment, trade-offs, and next work", y)
     y = bullets(c, [
         "Core rubric alignment is complete across problem/data, modelling, inference, production considerations, and documentation. A successful 7,043-row end-to-end ingestion replay and embedded quality report are retained as evidence.",
         "Recall is prioritized because missing a churner is assumed costlier than an unnecessary offer; threshold economics require real campaign costs.",
-        "Next: one-hot nominal features, delayed-label AUC and ROI automation, hosted CI evidence, external notifications, and scheduling.",
-        "Docker monitoring is locally verified; hosted CI, SHAP/LIME, Streamlit, notification delivery, and cloud deployment remain unverified.",
+        "Next: evaluate an encoding migration with full retraining, automate delayed-label AUC and ROI, retain hosted CI evidence, approve external notification delivery, and schedule recurring jobs.",
+        "Docker monitoring and internal Alertmanager delivery are locally verified; external delivery, hosted CI, SHAP/LIME, Streamlit, and cloud deployment remain unverified.",
     ], 40, y, 500, 7.6, 9.0)
-    y = paragraph(c, "Ownership follows the signal: engineers receive availability, error, latency, schema, and freshness alerts; data scientists own drift, delayed-label evaluation, threshold review, and promotion; business teams receive churn-volume and campaign-outcome summaries. The current 104/104 tests (100 unit and 4 integration) and 69% unit-suite coverage are verified evidence, not a claim of exhaustive cloud production testing. Verification evidence is retained alongside source code.", 40, y, 500, 7.5, 9.0)
-    metric_card(c, 38, 58, 155, 65, "All tests", f"{test_result['tests_passed']}/{test_result['tests_collected']}", "100 unit + 4 integration")
+    y = paragraph(c, "Ownership follows the signal: engineers receive availability, error, latency, schema, and freshness alerts; data scientists own drift, delayed-label evaluation, threshold review, and promotion; business teams receive churn-volume and campaign-outcome summaries. Alertmanager's internal audit delivery is verified; external webhook, Slack, and email routes are configured through file-backed secrets but require approved credentials and delivery evidence. The current 117/117 tests (100 unit and 17 integration) and 69% unit-suite coverage are verified evidence, not a claim of exhaustive cloud production testing.", 40, y, 500, 7.5, 9.0)
+    metric_card(c, 38, 58, 155, 65, "All tests", f"{test_result['tests_passed']}/{test_result['tests_collected']}", "100 unit + 17 integration")
     metric_card(c, 214, 58, 155, 65, "Source coverage", f"{test_result['source_coverage_percent']}%", "fresh project-local run", AMBER)
     metric_card(c, 390, 58, 155, 65, "Submission", "6 pages", "diagram + four evidence panels", GREEN)
     c.save()

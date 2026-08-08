@@ -69,8 +69,9 @@ def test_encode_categorical(sample_data, base_config):
     assert encoded['gender'].isin([0, 1]).all()
     assert encoded['Partner'].isin([0, 1]).all()
     
-    # Check one-hot encoded columns exist
-    assert 'Contract_Month-to-month' in encoded.columns or 'Contract' in encoded.columns
+    # Multi-class inputs retain one integer-encoded column; this is not one-hot.
+    assert 'Contract' in encoded.columns
+    assert pd.api.types.is_integer_dtype(encoded['Contract'])
 
 
 def test_scale_numerical(sample_data, base_config):

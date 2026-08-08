@@ -188,9 +188,10 @@ class FeatureEngineer:
         else:
             # Serving mode: use stored threshold
             if self.high_value_threshold is None:
-                # Fallback: use a reasonable default
-                self.high_value_threshold = 70.0
-                logger.warning(f"Using default high value threshold: ${self.high_value_threshold:.2f}")
+                raise RuntimeError(
+                    "High-value feature threshold is unavailable in online mode. "
+                    "Load artifacts/feature_threshold.json before creating serving features."
+                )
         
         return (df['MonthlyCharges'] > self.high_value_threshold).astype(int)
     

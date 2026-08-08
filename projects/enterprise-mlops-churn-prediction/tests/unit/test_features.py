@@ -114,13 +114,19 @@ def test_create_features_offline(sample_data):
     # Check no NaN values in engineered features
     assert not result['avg_monthly_charge'].isna().any()
     assert not result['service_adoption_score'].isna().any()
+    assert engineer.high_value_threshold == pytest.approx(
+        sample_data['MonthlyCharges'].quantile(0.75)
+    )
 
 
 def test_create_features_online(sample_data):
-    """Test feature creation in online mode"""
+    """Online feature creation fails closed until its threshold is loaded."""
     engineer = FeatureEngineer()
+
+    with pytest.raises(RuntimeError, match="feature threshold is unavailable"):
+        engineer.create_features(sample_data, mode='online')
+
     engineer.high_value_threshold = 70.0  # Set threshold
-    
     result = engineer.create_features(sample_data, mode='online')
     
     # Should create same features as offline

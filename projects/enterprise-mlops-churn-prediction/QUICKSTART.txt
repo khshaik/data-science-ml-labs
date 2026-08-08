@@ -5,7 +5,7 @@ ENTERPRISE MLOPS CHURN PREDICTION - VERIFIED QUICK START
 STATUS: Core assignment workflow implemented and verified locally on 08 Aug 2026
 CHAMPION: baseline_v1.0.0 (balanced Logistic Regression)
 CANDIDATE: TensorFlow 2.13 neural network [64, 32, 16]
-TESTS: 100 unit + 16 integration tests passed (116 total)
+TESTS: 100 unit + 17 integration tests passed (117 total)
 SUBMISSION: 6-page, 1,523-word PDF with architecture and evidence panels
 
 Status vocabulary used below:
@@ -111,7 +111,8 @@ Expected outputs:
 
 Implemented behavior:
   - schema, missingness, range, duplicate, and consistency checks;
-  - merge plus customerID deduplication, keeping the latest input occurrence;
+  - merge plus customerID deduplication, keeping the last row by ingestion
+    order (incoming rows follow existing rows; no event-time claim);
   - six engineered features shared across training and serving;
   - raw stratified 60/20/20 split before fitted transformations;
   - train-only encoders, scaler, and high-value threshold.
@@ -251,9 +252,9 @@ Run the complete integration suite:
   python -m pytest tests/integration -q
 
 Verified result:
-  16 passed
-  4 saved-artifact API tests cover the real champion, preprocessor, threshold,
-  /health, /predict, and /metrics. The other 12 enforce dependency, governed
+  17 passed
+  5 saved-artifact serving tests cover the real champion, preprocessor, threshold,
+  /health, /predict, /metrics, and offline/online final-vector parity. The other 12 enforce dependency, governed
   documentation, and Alertmanager routing/receiver contracts.
 
 Test artifacts:
@@ -313,7 +314,7 @@ Prometheus UI             VERIFIED     API target up; 4 mounted alert rules load
 Grafana                    VERIFIED     Datasource and churn dashboard provisioned
 Streamlit                  PROTOTYPE    App exists; not execution-verified
 SHAP/LIME                  PROTOTYPE    Module/tests exist; live endpoint not verified
-GitHub Actions CI          IMPLEMENTED  Artifact flow and 16 integration tests fixed;
+GitHub Actions CI          IMPLEMENTED  Artifact flow and 17 integration tests fixed;
                                         hosted workflow run not yet retained
 
 Configured prototype URLs when their services are running:
@@ -345,7 +346,9 @@ Known optional hardening work:
   2. Run the repository-root GitHub Actions workflow and retain its successful
      hosted-run URL as execution evidence.
   3. Automate delayed-label AUC/recall and campaign-ROI collection.
-  4. Replace nominal integer encoding with an explicit unknown-safe encoder.
+  4. Replace fitted nominal integer encoding with one-hot encoding or a
+     dedicated unknown sentinel only alongside full retraining, evaluation,
+     artifact replacement, and API/batch parity verification.
   5. Add external scheduling only if automated retraining is desired.
 
 ================================================================================

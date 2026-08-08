@@ -97,7 +97,11 @@ class DataIngestion:
             merged_data = new_data.copy()
             logger.info(f"✅ Using new data as initial training set: {len(merged_data)} rows")
         
-        # Remove duplicates (based on customerID)
+        # Remove duplicates based on customerID. Existing rows are concatenated
+        # first and incoming rows second, so keep='last' makes the incoming row
+        # win across batches. Within one file, the last occurrence wins. The
+        # source has no event/update timestamp, so this is ingestion order—not
+        # a claim about event-time recency.
         duplicates_removed = 0
         if 'customerID' in merged_data.columns:
             before_dedup = len(merged_data)
@@ -106,7 +110,10 @@ class DataIngestion:
             duplicates_removed = before_dedup - after_dedup
             
             if duplicates_removed > 0:
-                logger.info(f"ℹ️  Removed {duplicates_removed} duplicate customer IDs (kept most recent)")
+                logger.info(
+                    f"ℹ️  Removed {duplicates_removed} duplicate customer IDs "
+                    "(kept last row by ingestion order; incoming follows existing)"
+                )
         
         # Save merged data
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -123,6 +130,7 @@ class DataIngestion:
             'existing_rows': len(existing_data),
             'total_rows': len(merged_data),
             'duplicates_removed': duplicates_removed,
+            'deduplication_policy': 'last_row_by_ingestion_order_incoming_after_existing',
             'quality_report': quality_report
         }
         
@@ -135,6 +143,7 @@ class DataIngestion:
         logger.info(f"  Existing rows: {summary['existing_rows']}")
         logger.info(f"  Total rows: {summary['total_rows']}")
         logger.info(f"  Duplicates removed: {summary['duplicates_removed']}")
+        logger.info(f"  Deduplication policy: {summary['deduplication_policy']}")
         logger.info(f"  Timestamp: {summary['timestamp']}")
         logger.info("=" * 80)
         

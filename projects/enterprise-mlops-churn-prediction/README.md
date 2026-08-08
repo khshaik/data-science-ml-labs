@@ -10,7 +10,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-verified-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-provisioned-F46800?logo=grafana&logoColor=white)](https://grafana.com/)
-[![Tests](https://img.shields.io/badge/tests-104%20passed-2EA44F)](artifacts/test_summary.json)
+[![Tests](https://img.shields.io/badge/tests-117%20passed-2EA44F)](artifacts/test_summary.json)
 
 ## Executive overview
 
@@ -30,7 +30,7 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 | Source dataset identity, provenance, checksum, and rights | **Implemented** | [`docs/dataset_provenance_and_license.md`](docs/dataset_provenance_and_license.md) |
 | Batch ingestion, validation, merge, and deduplication | **Implemented and executed** | [`src/data/ingestion.py`](src/data/ingestion.py), [`artifacts/logs/ingestion_20260808_082509.json`](artifacts/logs/ingestion_20260808_082509.json) |
 | Leakage-safe split and fitted preprocessing | **Implemented and persisted** | [`src/data/preprocessing.py`](src/data/preprocessing.py), [`artifacts/preprocessor.pkl`](artifacts/preprocessor.pkl) |
-| Offline/online feature consistency | **Implemented and persisted** | [`src/features/engineering.py`](src/features/engineering.py), [`artifacts/feature_threshold.json`](artifacts/feature_threshold.json) |
+| Offline/online feature consistency | **Implemented, persisted, and parity-tested** | Shared 25-column vector verified across independently loaded API/batch paths; a missing fitted threshold fails closed instead of using a fallback |
 | Baseline and TensorFlow candidate training | **Implemented and executed** | [`models/baseline/logistic_regression_v1.pkl`](models/baseline/logistic_regression_v1.pkl), [`models/candidate/neural_network_v1.h5`](models/candidate/neural_network_v1.h5) |
 | Evaluation and governed champion selection | **Implemented and executed** | [`artifacts/eval/model_comparison.md`](artifacts/eval/model_comparison.md), [`models/current_best.json`](models/current_best.json) |
 | Fresh-clone API startup from saved artifacts | **Implemented and integration-tested** | Real saved-artifact startup tests in [`tests/integration/test_saved_artifact_api.py`](tests/integration/test_saved_artifact_api.py) |
@@ -39,8 +39,22 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 | Prometheus rules and Grafana provisioning | **Implemented and verified end to end** | [`artifacts/monitoring/stack_verification.json`](artifacts/monitoring/stack_verification.json) |
 | Alert notification delivery | **Internal verified; external ready for credentials** | [`notification_routing_verification.json`](artifacts/monitoring/notification_routing_verification.json) records live internal delivery; the secure template fans warning/critical alerts out to webhook, Slack, and email without committing secrets |
 | Drift detection and retraining eligibility | **Implemented and locally exercised** | [`src/monitoring/drift_detector.py`](src/monitoring/drift_detector.py), [`src/retraining/trigger.py`](src/retraining/trigger.py) |
+| Automated regression evidence | **117/117 passed** | 100 unit + 17 integration tests and 69% source coverage in [`artifacts/test_summary.json`](artifacts/test_summary.json) |
+| Rubric-ordered Word submission | **Complete and visually verified** | Six pages and 1,929 words in [`docs/Enterprise_MLOps_Churn_Level4_Analytical_Summary.docx`](docs/Enterprise_MLOps_Churn_Level4_Analytical_Summary.docx) |
 | GitHub Actions lifecycle workflow | **Implemented; hosted run pending** | [`.github/workflows/enterprise-mlops-churn-ci.yml`](../../.github/workflows/enterprise-mlops-churn-ci.yml) |
 | Automated production deployment or retraining | **Outside current scope** | CI validates readiness; a human or CI invocation starts training and no external environment is mutated automatically |
+
+### Verified release snapshot
+
+| Dimension | Verified result | Primary proof |
+|---|---|---|
+| Data | 7,043 customers, 21 raw columns, 26.5% churn rate | [`data/raw/telco_customer_churn.csv`](data/raw/telco_customer_churn.csv) and [provenance record](docs/dataset_provenance_and_license.md) |
+| Features | Six engineered features; training-only p75 threshold `89.75`; final vector has 25 columns | [`config/feature_config.yaml`](config/feature_config.yaml), [`artifacts/feature_threshold.json`](artifacts/feature_threshold.json) |
+| Champion | `baseline_v1.0.0`; candidate validation AUC was `0.0054` lower | [`models/current_best.json`](models/current_best.json), [`artifacts/eval/model_comparison.md`](artifacts/eval/model_comparison.md) |
+| Serving | FastAPI and chunked batch inference use the same saved bundle | [`src/serving/api.py`](src/serving/api.py), [`src/serving/batch_predict.py`](src/serving/batch_predict.py) |
+| Performance | 9.56 ms average, 10.21 ms sequential p95, 126.29 requests/second concurrent throughput | [`artifacts/benchmark_results.json`](artifacts/benchmark_results.json) |
+| Monitoring | Prometheus/Grafana provisioned; internal Alertmanager delivery verified | [`stack_verification.json`](artifacts/monitoring/stack_verification.json), [`notification_routing_verification.json`](artifacts/monitoring/notification_routing_verification.json) |
+| Regression gate | 100 unit + 17 integration = **117/117 passed**; 69% coverage | [`artifacts/test_summary.json`](artifacts/test_summary.json) |
 
 ## End-to-end architecture and user/system workflow
 
@@ -109,9 +123,15 @@ shasum -a 256 data/raw/telco_customer_churn.csv
 2. apply schema, missingness, range, duplicate, and consistency checks;
 3. abort before writing if blocking checks fail;
 4. load an existing training file when present;
-5. append the new batch and retain the latest record for duplicate `customerID` values;
+5. append the new batch and retain the last row by ingestion order for duplicate `customerID` values;
 6. write the merged training data; and
 7. persist a timestamped JSON audit summary.
+
+Existing rows are ordered before incoming rows, so an incoming row replaces an
+existing row with the same `customerID`. Within a single file, the last
+occurrence wins. Because the source has no event/update timestamp, this policy
+does not claim event-time recency; a future timestamp contract would be needed
+for that guarantee.
 
 The representative replay in [`artifacts/logs/ingestion_20260808_082509.json`](artifacts/logs/ingestion_20260808_082509.json) is Git-retained evidence of the complete path:
 
@@ -162,6 +182,15 @@ Six business features are defined once in [`src/features/engineering.py`](src/fe
 | `high_value_customer` | `MonthlyCharges` above the training-set 75th percentile | Fitted value `89.75` persisted in [`artifacts/feature_threshold.json`](artifacts/feature_threshold.json) |
 
 Categorical encoders, the numerical scaler, and the final feature order are fitted only on training rows and saved together in [`artifacts/preprocessor.pkl`](artifacts/preprocessor.pkl). Training, FastAPI, batch inference, and saved-artifact integration tests all load this same object. This is the project’s lightweight alternative to a full feature store and prevents duplicated training-serving transformation logic.
+
+The retained model contract uses one fitted `LabelEncoder` integer column per
+categorical input; it does **not** one-hot encode production features. At
+serving time, an unseen multi-class value maps to that encoder's first known
+class, while unseen values in the binary columns remain strict and raise a
+validation error. This compatibility policy is explicit but intentionally
+conservative. Migrating to one-hot encoding or a dedicated unknown sentinel
+would change the 25-column feature contract and therefore requires retraining,
+re-evaluation, artifact replacement, and renewed API/batch parity evidence.
 
 ### 5. Training and experiment tracking
 
@@ -364,14 +393,14 @@ Apply promotion guardrails
     ├── PROMOTE CANDIDATE ─┐
     └── KEEP BASELINE ─────┤ both are governed outcomes
                            ↓
-16 integration tests: 4 saved-artifact API + 12 dependency/documentation/notification contracts
+17 integration tests: 5 saved-artifact serving + 12 dependency/documentation/notification contracts
     ↓
 Docker build and API smoke test
     ↓
 Release-readiness summary (no external deployment)
 ```
 
-The workflow uploads quality, coverage, training, serving, and evaluation artifacts between jobs. It verifies that the comparison decision, process exit status, champion type, and selected model path agree. It runs all 16 existing integration tests rather than referencing a missing placeholder suite.
+The workflow uploads quality, coverage, training, serving, and evaluation artifacts between jobs. It verifies that the comparison decision, process exit status, champion type, and selected model path agree. It runs all 17 existing integration tests rather than referencing a missing placeholder suite.
 
 **Verification boundary:** all tests and Docker/monitoring checks described below were executed locally. A successful GitHub-hosted Actions run URL has not yet been retained, so hosted CI execution must not be represented as verified. The Linux CI dependency installation must also succeed with the TensorFlow 2.13 compatibility constraints before release readiness is claimed.
 
@@ -384,16 +413,17 @@ The workflow uploads quality, coverage, training, serving, and evaluation artifa
 | Test group | Passed | Failed |
 |---|---:|---:|
 | Unit | 100 | 0 |
-| Saved-artifact API integration | 4 | 0 |
+| Saved-artifact serving integration | 5 | 0 |
 | Dependency, documentation, and notification contracts | 12 | 0 |
-| **Total** | **116** | **0** |
+| **Total** | **117** | **0** |
 
-Source coverage is **69%**. Four of the 16 integration tests start the real FastAPI lifespan and verify:
+Source coverage is **69%**. Five of the 17 integration tests exercise the retained serving bundle and verify:
 
 1. every champion-serving artifact exists;
 2. `/health` reports the loaded champion;
 3. `/predict` executes with the real preprocessor and champion model; and
-4. `/metrics` exposes prediction observability.
+4. `/metrics` exposes prediction observability; and
+5. offline batch and online API preprocessing produce an identical final vector.
 
 Run the same checks:
 
@@ -539,10 +569,10 @@ enterprise-mlops-churn-prediction/
 ├── monitoring/                     # Prometheus rules and Grafana provisioning
 ├── docker/                         # API image and multi-service Compose stack
 ├── tests/unit/                     # 100 unit tests
-├── tests/integration/              # 16 cross-component integration contracts
+├── tests/integration/              # 17 cross-component integration contracts
 ├── scripts/                        # Benchmark, monitoring verifier, report builder
 ├── webapp/                         # Optional Streamlit prototype
-├── docs/                           # Architecture, design, provenance, alignment
+├── docs/                           # Architecture, provenance, design, six-page DOCX
 ├── mlflow.db                       # Retained local experiment metadata
 └── output/pdf/                     # Consolidated submission report
 ```
@@ -557,24 +587,21 @@ This is a verified mini-production system, not a claim of a fully managed cloud 
 2. **External notification verification:** supply approved webhook/Slack/email credentials and retain delivery evidence; the internal Alertmanager audit route and secret-managed external template are implemented.
 3. **Authentication and network controls:** replace permissive development CORS and protect API, Prometheus, Grafana, and MLflow before shared or internet-facing deployment.
 4. **Delayed-label monitoring:** automate recent AUC, recall, calibration, and campaign-outcome collection once production labels exist.
-5. **Feature evolution:** replace simple category mappings with an explicit unknown-category policy before accepting unconstrained production categories.
+5. **Feature evolution:** replace the documented compatibility mapping with one-hot encoding or a dedicated unknown sentinel before accepting unconstrained production categories; retrain and re-govern both models after changing the feature contract.
 6. **Scheduling:** attach ingestion, drift checks, and approved retraining to an orchestrator only when operational ownership and rollback procedures exist.
 7. **Scale validation:** rerun load, failure, and recovery tests in the target infrastructure; local benchmarks do not establish a production SLA.
 
-## Retained evidence index
+## Retained artifact and evidence index
 
-- [Detailed end-to-end user/system workflow](docs/mermaid-diagram.png)
-- [Mini-production architecture summary](docs/architecture_diagram.svg)
-- [Dataset provenance and license record](docs/dataset_provenance_and_license.md)
-- [Representative ingestion audit](artifacts/logs/ingestion_20260808_082509.json)
-- [Baseline evaluation](artifacts/eval/baseline_evaluation.json)
-- [TensorFlow candidate evaluation](artifacts/eval/candidate_evaluation.json)
-- [Model comparison and promotion decision](artifacts/eval/model_comparison.md)
-- [Champion manifest](models/current_best.json)
-- [API verification response](artifacts/api_response.json)
-- [Latency and throughput benchmark](artifacts/benchmark_results.json)
-- [Monitoring-stack verification](artifacts/monitoring/stack_verification.json)
-- [Test summary](artifacts/test_summary.json)
-- [Final submission PDF](output/pdf/enterprise_mlops_churn_submission.pdf)
-- [Detailed design](docs/design_document.md)
-- [Assignment alignment and workflow](docs/assignment_alignment_and_workflow.md)
+| Artifact group | Retained files | Purpose |
+|---|---|---|
+| Submission | [Six-page Level 4 DOCX](docs/Enterprise_MLOps_Churn_Level4_Analytical_Summary.docx), [canonical PDF](output/pdf/enterprise_mlops_churn_submission.pdf) | Rubric-ordered review and submission handoff |
+| Architecture | [Lifecycle architecture](docs/architecture_diagram.svg), [detailed workflow](docs/mermaid-diagram.png) | Data source through governed retraining, including user/system interactions |
+| Data governance | [Provenance and licensing](docs/dataset_provenance_and_license.md), [ingestion audit](artifacts/logs/ingestion_20260808_082509.json) | Source identity, checksum, rights boundary, quality-gated replay and deduplication policy |
+| Feature contract | [Fitted preprocessor](artifacts/preprocessor.pkl), [feature threshold](artifacts/feature_threshold.json), [feature configuration](config/feature_config.yaml) | Train-only fitted state reused by training, API and batch inference |
+| Models and governance | [Baseline](models/baseline/logistic_regression_v1.pkl), [TensorFlow candidate](models/candidate/neural_network_v1.h5), [champion manifest](models/current_best.json) | Fresh-clone serving bundle and deterministic champion selection |
+| Evaluation | [Baseline report](artifacts/eval/baseline_evaluation.json), [candidate report](artifacts/eval/candidate_evaluation.json), [comparison](artifacts/eval/model_comparison.md) | Validation guardrails, untouched-test results and KEEP BASELINE decision |
+| Serving evidence | [API response](artifacts/api_response.json), [benchmark](artifacts/benchmark_results.json) | Real champion response and latency/throughput measurements |
+| Monitoring evidence | [Stack verification](artifacts/monitoring/stack_verification.json), [notification routing](artifacts/monitoring/notification_routing_verification.json) | Prometheus rules, Grafana provisioning and internal Alertmanager delivery |
+| Test evidence | [Test summary](artifacts/test_summary.json), [unit tests](tests/unit/), [integration tests](tests/integration/) | 117/117 checks covering modules, dependencies, documentation, notifications and saved-artifact parity |
+| Design traceability | [Assignment alignment](docs/assignment_alignment_and_workflow.md), [detailed design](docs/design_document.md) | Requirement mapping, decisions, boundaries and future hardening |

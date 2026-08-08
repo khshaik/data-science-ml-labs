@@ -48,7 +48,7 @@ def test_ingest_batch_creates_training_file_and_summary(tmp_path, monkeypatch):
     assert list((tmp_path / "artifacts/logs").glob("ingestion_*.json"))
 
 
-def test_ingest_batch_merges_and_deduplicates_by_customer(tmp_path, monkeypatch):
+def test_ingest_batch_incoming_row_wins_by_ingestion_order(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "config.yaml"
     _write_config(config_path)
@@ -64,6 +64,12 @@ def test_ingest_batch_merges_and_deduplicates_by_customer(tmp_path, monkeypatch)
     merged = pd.read_csv(output)
 
     assert summary["duplicates_removed"] == 1
+    assert summary["existing_rows"] == 1
+    assert summary["new_rows"] == 2
+    assert summary["total_rows"] == 2
+    assert summary["deduplication_policy"] == (
+        "last_row_by_ingestion_order_incoming_after_existing"
+    )
     assert len(merged) == 2
     assert merged.loc[merged.customerID == "C001", "MonthlyCharges"].iloc[0] == 55.0
 

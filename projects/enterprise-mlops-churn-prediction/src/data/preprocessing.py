@@ -51,8 +51,13 @@ class DataPreprocessor:
     
     def encode_categorical(self, df: pd.DataFrame, fit: bool = True) -> pd.DataFrame:
         """
-        Encode categorical variables
-        Based on original notebook encoding strategy
+        Encode categorical variables with fitted integer mappings.
+
+        Binary and multi-class input columns each retain a training-fitted
+        LabelEncoder. During serving, an unseen multi-class value maps to that
+        encoder's first known class for compatibility with the retained model;
+        unseen binary values remain strict and raise from LabelEncoder. This is
+        not one-hot encoding.
         """
         df = df.copy()
         
@@ -70,7 +75,9 @@ class DataPreprocessor:
                     if col in self.label_encoders:
                         df[col] = self.label_encoders[col].transform(df[col])
         
-        # Multi-class categorical features (one-hot encoding from original notebook)
+        # Multi-class categorical features use fitted integer encoding. This
+        # preserves the retained model's 25-column input contract; it is not
+        # one-hot encoding.
         multi_class_features = ['MultipleLines', 'InternetService', 'OnlineSecurity',
                                'OnlineBackup', 'DeviceProtection', 'TechSupport',
                                'StreamingTV', 'StreamingMovies', 'Contract', 'PaymentMethod']
@@ -87,7 +94,8 @@ class DataPreprocessor:
                     self.label_encoders[col] = le
                 else:
                     if col in self.label_encoders:
-                        # Handle unseen categories
+                        # Retained-model compatibility policy: map an unseen
+                        # multi-class value to the encoder's first known class.
                         df[col] = df[col].astype(str).apply(
                             lambda x: x if x in self.label_encoders[col].classes_ else self.label_encoders[col].classes_[0]
                         )
