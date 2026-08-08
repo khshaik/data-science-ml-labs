@@ -44,10 +44,6 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 
 ## End-to-end architecture and user/system workflow
 
-![Detailed enterprise churn workflow connecting data sources, ingestion, quality controls, shared features, model training and governance, online and batch inference, users, monitoring, alerts, and retraining](docs/mermaid-diagram.png)
-
-The detailed workflow shows how internal and external actors interact with the implemented system. CRM batches pass through ingestion and quality controls; shared feature and preprocessing artifacts feed governed training as well as online and batch inference; customer-service agents and marketing analysts consume predictions; and delayed labels, operational metrics, and drift signals close the monitoring and retraining-decision loop.
-
 ### Governed ML lifecycle summary
 
 ![Enterprise Telco Churn ML lifecycle: Data Sources to Pipelines, Features, Training, optional Model Registry, Serving, Monitoring, and Retraining](docs/architecture_diagram.svg)
@@ -62,6 +58,12 @@ The lifecycle summary condenses the same implementation into eight review stages
 - **Serving:** FastAPI handles synchronous requests; the batch scorer handles file-oriented campaign inference. Both load the same champion bundle.
 - **Monitoring:** API counters and latency histograms are scraped by Prometheus; Grafana visualizes operational signals; separate statistical checks detect data drift.
 - **Retraining:** new labeled volume, AUC degradation, feature drift, and model age produce an eligibility decision. Retraining and promotion remain governed actions.
+
+### Detailed user and system workflow
+
+![Detailed enterprise churn workflow connecting data sources, ingestion, quality controls, shared features, model training and governance, online and batch inference, users, monitoring, alerts, and retraining](docs/mermaid-diagram.png)
+
+The detailed workflow shows how internal and external actors interact with the implemented system. CRM batches pass through ingestion and quality controls; shared feature and preprocessing artifacts feed governed training as well as online and batch inference; customer-service agents and marketing analysts consume predictions; and delayed labels, operational metrics, and drift signals close the monitoring and retraining-decision loop.
 
 ## Complete ML lifecycle
 
