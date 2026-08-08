@@ -1,0 +1,96 @@
+{
+  "comparison": {
+    "baseline": {
+      "dataset": "validation",
+      "accuracy": 0.7487579843860894,
+      "precision": 0.5174216027874564,
+      "recall": 0.7941176470588235,
+      "f1": 0.6265822784810126,
+      "auc": 0.8354142447492832,
+      "confusion_matrix": [
+        [
+          758,
+          277
+        ],
+        [
+          77,
+          297
+        ]
+      ]
+    },
+    "candidate": {
+      "dataset": "validation",
+      "accuracy": 0.7352732434350603,
+      "precision": 0.5008726003490401,
+      "recall": 0.767379679144385,
+      "f1": 0.6061246040126715,
+      "auc": 0.8299943165672066,
+      "confusion_matrix": [
+        [
+          749,
+          286
+        ],
+        [
+          87,
+          287
+        ]
+      ]
+    },
+    "differences": {
+      "accuracy": -0.01348474095102914,
+      "precision": -0.016549002438416283,
+      "recall": -0.0267379679144385,
+      "f1": -0.020457674468341014,
+      "auc": -0.005419928182076594
+    },
+    "selection_dataset": "validation",
+    "final_test": {
+      "baseline": {
+        "dataset": "test",
+        "accuracy": 0.7366926898509581,
+        "precision": 0.5025817555938038,
+        "recall": 0.7807486631016043,
+        "f1": 0.6115183246073299,
+        "auc": 0.8429073342116821,
+        "confusion_matrix": [
+          [
+            746,
+            289
+          ],
+          [
+            82,
+            292
+          ]
+        ]
+      },
+      "candidate": {
+        "dataset": "test",
+        "accuracy": 0.7324343506032647,
+        "precision": 0.49747899159663866,
+        "recall": 0.7914438502673797,
+        "f1": 0.6109391124871001,
+        "auc": 0.836389470149061,
+        "confusion_matrix": [
+          [
+            736,
+            299
+          ],
+          [
+            78,
+            296
+          ]
+        ]
+      }
+    }
+  },
+  "promotion_decision": {
+    "should_promote": false,
+    "reason": "Candidate does not improve baseline validation AUC: difference -0.0054 < required gain 0.0000",
+    "promoted_model": "baseline"
+  },
+  "promotion_rules": {
+    "min_auc": 0.8,
+    "min_recall": 0.75,
+    "min_auc_gain": 0.0
+  }
+}

@@ -5,15 +5,15 @@ groups:
   - name: churn_prediction_alerts
     interval: 30s
     rules:
-      # High error rate
+      # High error ratio across prediction requests
       - alert: HighErrorRate
-        expr: rate(prediction_errors_total[5m]) > 0.05
+        expr: rate(prediction_errors_total[5m]) / clamp_min(rate(prediction_requests_total[5m]), 0.001) > 0.05
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "High prediction error rate"
-          description: "Error rate is {{ $value }} errors/sec (threshold: 0.05)"
+          description: "Prediction error ratio is {{ $value | humanizePercentage }} (threshold: 5%)"
 
       # High latency
       - alert: HighLatency

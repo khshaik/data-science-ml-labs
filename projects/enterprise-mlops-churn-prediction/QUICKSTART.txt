@@ -1,0 +1,362 @@
+================================================================================
+ENTERPRISE MLOPS CHURN PREDICTION - VERIFIED QUICK START
+================================================================================
+
+STATUS: Core assignment workflow implemented and verified locally on 08 Aug 2026
+CHAMPION: baseline_v1.0.0 (balanced Logistic Regression)
+CANDIDATE: TensorFlow 2.13 neural network [64, 32, 16]
+TESTS: 100 unit + 4 saved-artifact integration tests passed
+SUBMISSION: 6-page, 1,523-word PDF with architecture and evidence panels
+
+Status vocabulary used below:
+  VERIFIED    Executed successfully in the project-local environment
+  IMPLEMENTED Code/configuration exists and is covered by tests or inspection
+  PROTOTYPE   Optional component exists but is not end-to-end verified
+
+Run every command from the project root:
+  enterprise-mlops-churn-prediction/
+
+================================================================================
+1. ENVIRONMENT SETUP
+================================================================================
+
+Preferred path - reuse the existing verified environment when it is present:
+
+  source venv/bin/activate
+  python --version
+  python -c "import tensorflow as tf; print(tf.__version__)"
+
+Verified environment:
+  Python       3.9.6
+  TensorFlow   2.13.0
+  Keras        2.13.1
+  scikit-learn 1.3.0
+  MLflow       2.7.1
+  FastAPI      0.103.1
+
+Fallback for a clean machine only:
+
+  python3.9 -m venv venv
+  source venv/bin/activate
+  python -m pip install --upgrade pip
+  python -m pip install -r requirements.txt
+
+TensorFlow wheel availability depends on the operating system, CPU architecture,
+and Python version. Python 3.9 is the supported project baseline.
+
+================================================================================
+2. FASTEST VERIFIED DEMO - NO RETRAINING REQUIRED
+================================================================================
+
+The repository contains the selected baseline model, TensorFlow candidate,
+fitted preprocessor, learned feature threshold, champion manifest, and evaluation
+reports. After environment activation, the API can load these saved artifacts.
+
+Terminal 1 - start FastAPI:
+
+  uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
+
+Terminal 2 - verify service health and prediction:
+
+  curl http://127.0.0.1:8000/health
+
+  curl -X POST "http://127.0.0.1:8000/predict" \
+    -H "Content-Type: application/json" \
+    --data @sample_request.json
+
+  curl http://127.0.0.1:8000/metrics
+
+Expected health state:
+  HTTP 200
+  model_loaded = true
+  model_version = baseline_v1.0.0
+
+Useful URLs while the API runs:
+  API root       http://127.0.0.1:8000
+  Swagger UI     http://127.0.0.1:8000/docs
+  Health         http://127.0.0.1:8000/health
+  Metrics        http://127.0.0.1:8000/metrics
+
+================================================================================
+3. DATA QUALITY, INGESTION, FEATURES, AND PREPROCESSING - COMPLETE
+================================================================================
+
+Run data-quality checks:
+
+  python -m src.data.quality
+
+Demonstrate batch ingestion and retain its audit log:
+
+  python -m src.data.ingestion \
+    --input data/raw/telco_customer_churn.csv \
+    --output data/training/representative_ingestion_v1.csv
+
+Retained verification evidence from 08 August 2026:
+  artifacts/logs/ingestion_20260808_082509.json
+  Status: success; 7,043 input rows; 7,043 output rows; 0 duplicates removed.
+  This is a reproducibility replay of the authoritative repository dataset, not
+  a claim that the source CSV is a newly arrived production batch.
+
+Run feature-engineering and preprocessing demonstrations:
+
+  python -m src.features.engineering
+  python -m src.data.preprocessing
+
+Expected outputs:
+  artifacts/logs/data_quality_report_*.json
+  artifacts/logs/ingestion_*.json
+  data/training/representative_ingestion_v1.csv
+  artifacts/feature_threshold.json
+  artifacts/preprocessor.pkl
+
+Implemented behavior:
+  - schema, missingness, range, duplicate, and consistency checks;
+  - merge plus customerID deduplication, keeping the latest input occurrence;
+  - six engineered features shared across training and serving;
+  - raw stratified 60/20/20 split before fitted transformations;
+  - train-only encoders, scaler, and high-value threshold.
+
+Dataset provenance and data rights:
+  docs/dataset_provenance_and_license.md
+
+The dataset is the IBM Telco Customer Churn teaching sample, originally named
+WA_Fn-UseC_-Telco-Customer-Churn.csv. The evaluated file SHA-256 is:
+  88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a
+
+Kaggle records "Data files (c) Original Authors" and does not identify a standard
+open-data license. The project does not relicense the CSV.
+
+================================================================================
+4. TRAINING, EVALUATION, AND MLFLOW - COMPLETE
+================================================================================
+
+Retraining is optional for the fastest demo because verified artifacts are saved.
+To reproduce model development from the raw data:
+
+  python -m src.training.train --model baseline
+  python -m src.training.train --model candidate
+  python -m src.training.evaluate
+
+Important evaluation behavior:
+  src.training.evaluate exits with status 1 when the candidate is rejected.
+  For the retained results this is the correct governance outcome, not a training
+  error: candidate validation AUC 0.8300 is below baseline AUC 0.8354.
+
+Saved outputs:
+  models/baseline/logistic_regression_v1.pkl
+  models/candidate/neural_network_v1.h5
+  artifacts/preprocessor.pkl
+  artifacts/feature_threshold.json
+  artifacts/eval/baseline_evaluation.json
+  artifacts/eval/candidate_evaluation.json
+  artifacts/eval/model_comparison.json
+  artifacts/eval/model_comparison.md
+  models/current_best.json
+  mlflow.db
+
+Start MLflow UI:
+
+  mlflow ui \
+    --backend-store-uri sqlite:///mlflow.db \
+    --host 127.0.0.1 \
+    --port 5000
+
+Open:
+  http://127.0.0.1:5000
+
+Verified MLflow runs:
+  baseline_20260808_041203   FINISHED
+  candidate_20260808_041229  FINISHED
+
+================================================================================
+5. ONLINE AND OFFLINE INFERENCE - COMPLETE
+================================================================================
+
+Online inference trigger:
+  POST http://127.0.0.1:8000/predict
+
+Offline batch scoring:
+
+  python -m src.serving.batch_predict \
+    --input data/raw/telco_customer_churn.csv \
+    --output artifacts/predictions/batch_predictions.csv \
+    --chunk-size 1000
+
+Latency and throughput benchmark - API must already be running:
+
+  python scripts/benchmark_latency.py \
+    --url http://127.0.0.1:8000 \
+    --requests 100 \
+    --concurrency 10 \
+    --output artifacts/benchmark_results.json
+
+Retained localhost evidence:
+  Sequential requests       100/100 successful
+  Sequential average        9.56 ms
+  Sequential p95            10.21 ms
+  Sequential p99            18.79 ms
+  Concurrent requests       100/100 successful, concurrency 10
+  Concurrent p95            89.01 ms
+  Concurrent throughput     126.29 requests/second
+  Batch scoring             7,043 rows completed locally
+
+These measurements demonstrate functional local performance; they are not a
+cloud-capacity or production-SLA guarantee.
+
+================================================================================
+6. MONITORING AND RETRAINING DECISIONS - CORE COMPLETE
+================================================================================
+
+Run the simulated recent-batch drift check:
+
+  python -m src.monitoring.drift_detector
+
+Run four retraining-decision scenarios:
+
+  python -m src.retraining.trigger
+
+Implemented core scope:
+  - API prediction count, error count, and latency histogram;
+  - Prometheus-format /metrics endpoint;
+  - data-quality reports and warnings;
+  - PSI and KS tests for continuous features;
+  - chi-squared tests for categorical features;
+  - retraining signals for new labels, AUC drop, drift, and model age;
+  - JSON drift and retraining-decision logs.
+
+Automation boundary:
+  RetrainingTrigger decides eligibility and logs why. It does not automatically
+  start training. The configured weekly cron is a proposed policy; no scheduler
+  is installed. Actual retraining remains a human- or CI-triggered train/evaluate
+  workflow.
+
+================================================================================
+7. TESTS AND COVERAGE - VERIFIED
+================================================================================
+
+Run the verified unit suite:
+
+  python -m pytest tests/unit -q \
+    --cov=src \
+    --cov-report=term \
+    --cov-report=xml
+
+Verified result:
+  96 passed
+  0 failed
+  69% source coverage
+
+Run the real saved-artifact API integration suite:
+
+  python -m pytest tests/integration -q
+
+Verified result:
+  4 passed
+  Real champion, preprocessor, threshold, /health, /predict, and /metrics tested
+
+Test artifacts:
+  coverage.xml
+  artifacts/test_summary.json
+
+================================================================================
+8. COMPLETE REPRODUCTION ORDER
+================================================================================
+
+1. Activate the existing virtual environment.
+2. Run data quality and ingestion.
+3. Train the baseline and TensorFlow candidate.
+4. Evaluate both models; status 1 is expected when the baseline remains champion.
+5. Start FastAPI in a separate terminal.
+6. Test /health, /predict, and /metrics.
+7. Run the latency benchmark and offline batch scorer.
+8. Run drift detection and retraining-decision scenarios.
+9. Start MLflow UI if experiment inspection is required.
+10. Run the complete unit suite.
+
+Typical local runtime is approximately 10-15 minutes, depending on hardware.
+The already-saved-artifact API demo is substantially faster.
+
+================================================================================
+9. DELIVERABLES - COMPLETE
+================================================================================
+
+Final design submission:
+  output/pdf/enterprise_mlops_churn_submission.pdf
+  - 6 pages
+  - 1,523 extracted words
+  - architecture workflow
+  - four execution-evidence panels
+  - dataset provenance and data-rights disclosure
+
+Architecture image:
+  docs/architecture_diagram.svg
+
+Detailed documentation:
+  README.md
+  docs/design_document.md
+  docs/assignment_alignment_and_workflow.md
+  docs/requirement_gap_analysis.md
+  docs/dataset_provenance_and_license.md
+  FINAL_SUMMARY.txt
+
+================================================================================
+10. OPTIONAL COMPONENT STATUS - DO NOT OVERCLAIM
+================================================================================
+
+Component                 Status       Current boundary
+------------------------  -----------  -----------------------------------------
+Docker API image          VERIFIED     Clean TensorFlow/FastAPI runtime build passed
+Compose monitoring path   VERIFIED     API/Prometheus/Grafana health-gated and tested
+Prometheus UI             VERIFIED     API target up; 4 mounted alert rules loaded
+Grafana                    VERIFIED     Datasource and churn dashboard provisioned
+Streamlit                  PROTOTYPE    App exists; not execution-verified
+SHAP/LIME                  PROTOTYPE    Module/tests exist; live endpoint not verified
+GitHub Actions CI          IMPLEMENTED  Artifact flow and 4 integration tests fixed;
+                                        hosted workflow run not yet retained
+
+Configured prototype URLs when their services are running:
+  Streamlit    http://127.0.0.1:8501
+  Prometheus   http://127.0.0.1:9090
+  Grafana      http://127.0.0.1:3000
+
+Known optional hardening work:
+  1. Add Alertmanager routing only if external notifications are required.
+  2. Run the repository-root GitHub Actions workflow and retain its successful
+     hosted-run URL as execution evidence.
+  3. Automate delayed-label AUC/recall and campaign-ROI collection.
+  4. Replace nominal integer encoding with an explicit unknown-safe encoder.
+  5. Add external scheduling only if automated retraining is desired.
+
+================================================================================
+11. TROUBLESHOOTING
+================================================================================
+
+Problem: ModuleNotFoundError
+Action:  Confirm the current directory is the project root and activate venv.
+
+Problem: TensorFlow import or wheel failure
+Action:  Use Python 3.9 and the existing verified venv where available. Do not
+         replace the TensorFlow candidate with sklearn MLPClassifier.
+
+Problem: FileNotFoundError for model/preprocessor/threshold
+Action:  Confirm the saved artifacts listed in Section 4 exist. If they were
+         intentionally removed, run both training commands followed by evaluation.
+
+Problem: Evaluation command returns status 1
+Action:  Read artifacts/eval/model_comparison.json. Status 1 is expected when the
+         candidate fails promotion and the baseline is safely retained.
+
+Problem: API connection refused
+Action:  Start Uvicorn first and use host 127.0.0.1, port 8000.
+
+Problem: /health says model_loaded=false or startup fails
+Action:  Validate models/current_best.json and every referenced artifact path.
+
+Problem: Prometheus/Grafana URL does not respond
+Action:  Run docker compose -f docker/docker-compose.yml up -d api prometheus grafana
+         and then python scripts/verify_monitoring_stack.py. Inspect container
+         health and logs if the retained verification checks do not pass.
+
+================================================================================
+END OF VERIFIED QUICK START
+================================================================================

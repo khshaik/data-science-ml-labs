@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Install only serving dependencies. Training, MLflow, Streamlit, explainability,
+# and development packages do not belong in the API runtime image.
+COPY docker/requirements.api.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt

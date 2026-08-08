@@ -46,6 +46,7 @@ app.add_middleware(
 )
 
 # Prometheus metrics
+request_counter = Counter('prediction_requests_total', 'Total number of prediction requests')
 prediction_counter = Counter('predictions_total', 'Total number of predictions')
 prediction_latency = Histogram('prediction_latency_seconds', 'Prediction latency in seconds')
 error_counter = Counter('prediction_errors_total', 'Total number of prediction errors')
@@ -235,6 +236,7 @@ async def predict(customer: CustomerData):
         PredictionResponse with churn probability and prediction
     """
     start_time = time.time()
+    request_counter.inc()
     
     try:
         # Convert to DataFrame

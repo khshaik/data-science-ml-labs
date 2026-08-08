@@ -65,9 +65,11 @@ Customer churn is a critical challenge in the telecommunications industry, where
 
 ### 2.1 Dataset Description
 
-**Source**: Telco Customer Churn Dataset  
+**Source**: IBM Telco Customer Churn sample, originally distributed as `WA_Fn-UseC_-Telco-Customer-Churn.csv`. The [IBM archived code pattern](https://github.com/IBM/customer-churn-prediction) preserves the historical usage/source record; the [BlastChar Kaggle catalogue entry](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) is the public access record used for attribution.
 **Size**: 7,043 customers, 21 features  
 **Target Distribution**: ~26% churn rate (moderate class imbalance)
+
+**Provenance and data rights**: The evaluated repository copy is 977,501 bytes with SHA-256 `88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a`. Kaggle labels the data files “© Original Authors”; it does not name a standard open-data license. IBM's Apache-2.0 code-pattern license covers the example code, not automatically this separately supplied dataset. The project therefore makes no relicensing claim and uses the file for academic reproducibility. See [`docs/dataset_provenance_and_license.md`](dataset_provenance_and_license.md) for the complete provenance chain, access date, and reuse guidance.
 
 **Feature Categories**:
 - **Demographics**: gender, SeniorCitizen, Partner, Dependents

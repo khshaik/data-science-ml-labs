@@ -13,7 +13,7 @@ The major distinction is between **core rubric completion** and **optional/proto
 
 - Core rubric paths have been executed or directly verified: model training, evaluation, champion selection, API inference, batch scoring, benchmarking, drift detection, retraining-trigger scenarios, and unit tests.
 - MLflow's tracking backend and two finished runs are verified; its browser UI is available when the local UI command is started.
-- Prometheus, Grafana, Streamlit, Docker, CI/CD, and `/explain` are present as prototypes or configurations, but there is not enough retained evidence to claim that the complete multi-service stack was launched and verified end to end.
+- The Docker API plus Prometheus/Grafana path is locally verified with retained evidence. Streamlit, `/explain`, the MLflow Compose service, external alert delivery, and cloud deployment remain outside that verification boundary. The repository-root CI workflow is locally validated, but a hosted GitHub Actions run is not yet retained.
 - The retraining component decides and logs whether retraining is needed. It does not invoke training automatically and is not connected to a scheduler. This still meets the assignment, which explicitly permits pseudocode or a short unwired function.
 
 ## 2. Rubric cross-verification: what was asked and what is complete
@@ -22,9 +22,9 @@ The major distinction is between **core rubric completion** and **optional/proto
 |---|---|---|---|
 | 1. Problem Understanding & Data (4) | Use case, target, inputs, dataset, intended use, sound train/validation/test split | Binary telco churn use case; 7,043 rows and 21 raw columns; target `Churn`; intended real-time agent and monthly campaign use cases; stratified raw 60/20/20 split before fitting learned transformations; customer ID excluded from modeling | **Core complete.** A chronological split is not possible because this public snapshot has no event timestamp. State this explicitly rather than implying date boundaries exist. |
 | 2. Model Development & Correctness (4) | Appropriate preprocessing/model choice, correct implementation, metrics suited to problem | Shared cleaning/encoding/scaling; baseline balanced Logistic Regression; **TensorFlow** candidate `[64,32,16]` with dropout, early stopping, LR reduction, deterministic seeds, and balanced class weights; AUC, recall, precision, F1, accuracy and confusion matrix; validation selects the champion and test is kept as final evidence | **Core complete.** Candidate remains TensorFlow 2.13; it was not replaced by `sklearn` MLP. A future enhancement is one-hot encoding for nominal categories and a documented small tuning search. |
-| 3. Production System Design & Implementation (4) | Clear end-to-end inference workflow via API, batch, or app; Docker not required | FastAPI `/predict`, `/health`, `/metrics`, optional `/explain`; batch scorer; champion manifest used by both paths; shared feature/preprocessing artifacts; tested request/response and saved batch output | **Core complete.** Streamlit and Docker are optional prototypes and should not be described as verified deployment. |
-| 4. Evaluation & Production Considerations (4) | Suitable metrics, imbalance handling, plus latency/throughput/monitoring/reliability | Balanced training, promotion guardrails, 100 sequential + 100 concurrent request benchmark, batch throughput, Prometheus instrumentation, JSON quality/drift checks, retraining signals, incident response and rollback discussion | **Core complete.** Full Prometheus/Grafana deployment and delayed-label model/business KPI automation remain future hardening. |
-| 5. Documentation & Presentation (4) | Clear report covering approach, architecture, implementation, results, decisions, and repository link | Six-page, exactly 1,500-word consolidated PDF; clickable repository link; architecture image; four evidence panels; README, quick start, design document and this audit | **Complete, with minor cleanup advised.** Remove or qualify README claims that imply the optional dashboard/Compose/CI stack was verified. |
+| 3. Production System Design & Implementation (4) | Clear end-to-end inference workflow via API, batch, or app; Docker not required | FastAPI `/predict`, `/health`, `/metrics`, optional `/explain`; batch scorer; champion manifest used by both paths; shared artifacts; clean-built Docker API and retained monitoring verification | **Core complete.** Local container path verified; Streamlit, cloud deployment, and the MLflow Compose service remain outside the evidence boundary. |
+| 4. Evaluation & Production Considerations (4) | Suitable metrics, imbalance handling, plus latency/throughput/monitoring/reliability | Balanced training, promotion guardrails, benchmark, batch throughput, verified Prometheus/Grafana wiring, JSON quality/drift checks, retraining signals, incident response and rollback | **Core complete.** External notifications and delayed-label model/business KPI automation remain future hardening. |
+| 5. Documentation & Presentation (4) | Clear report covering approach, architecture, implementation, results, decisions, and repository link | Six-page, 1,523-word consolidated PDF; clickable repository link; architecture image; four evidence panels; README, quick start, design document and this audit | **Complete, with minor cleanup advised.** Keep optional hosted-CI and cloud-deployment claims qualified until retained execution evidence exists. |
 
 This is an evidence-based readiness assessment, not a prediction of the instructor's exact mark.
 
@@ -38,7 +38,7 @@ This is an evidence-based readiness assessment, not a prediction of the instruct
 | At least five non-trivial features | Six: `avg_monthly_charge`, `service_adoption_score`, `tenure_category`, `payment_risk_flag`, `contract_stability_score`, and `high_value_customer`. |
 | Offline versus online features | All six are documented for both modes in `config/feature_config.yaml`. The data-derived high-value threshold is fitted only on training rows and persisted as `artifacts/feature_threshold.json` (`89.75`). |
 | Prevent training-serving skew | Training, API and batch paths all call `FeatureEngineer` and `DataPreprocessor`; the serving paths load the fitted threshold and preprocessor instead of refitting them. |
-| Batch/micro-batch ingestion with merge/dedup/logging | Implemented in `src/data/ingestion.py`; covered by unit tests. **Evidence gap:** there is currently no retained `artifacts/logs/ingestion_*.json` from an end-to-end sample incoming batch. Add one before final handoff if log proof is desired. |
+| Batch/micro-batch ingestion with merge/dedup/logging | Implemented in `src/data/ingestion.py`, covered by unit tests, and executed end to end. `artifacts/logs/ingestion_20260808_082509.json` retains a successful 7,043-row reproducibility replay with its embedded quality report. |
 | Data quality | Executed report passed overall: zero missing rate, zero duplicates, valid ranges. Fifty-nine historical `TotalCharges` deviations are retained as a non-blocking warning. |
 
 ### B. Model Training and Offline Evaluation — 25%
@@ -95,7 +95,7 @@ Measured results:
 | Target/features and feature evaluation | Completed through six production features, feature configuration and the original notebook's chi-square/importance analysis. |
 | Training/evaluation split | Completed as stratified 60/20/20 train/validation/test. |
 | Chronological split and date boundaries | Not applicable to the available static dataset because it has no event timestamp. The chosen stratified split should be explicitly justified in the report. |
-| Log proofs | Quality, retraining, MLflow, evaluation, benchmark, drift, API and batch artifacts exist. A standalone end-to-end ingestion log is the one missing proof. |
+| Log proofs | Quality, ingestion, retraining, MLflow, evaluation, benchmark, drift, API and batch evidence exists. The retained ingestion record is explicitly a reproducibility replay of the authoritative static dataset. |
 
 ## 5. Execution and verification record
 
@@ -108,7 +108,7 @@ The existing project-local environment was reused; no replacement ML framework w
 ./venv/bin/python -m pytest tests/unit -q --cov=src --cov-report=term --cov-report=xml
 ```
 
-Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **96/96 passed**, source coverage **69%**.
+Verified versions: Python `3.9.6`, TensorFlow `2.13.0`, Keras `2.13.1`, scikit-learn `1.3.0`, MLflow `2.7.1`, FastAPI `0.103.1`. Test result: **100/100 unit and 4/4 integration passed**, source coverage **69%**.
 
 The API was also verified in process with FastAPI's `TestClient`, including application startup and artifact loading:
 
@@ -168,8 +168,8 @@ python scripts/build_submission_pdf.py
 | Prometheus-format API metrics | same as API | `http://127.0.0.1:8000/metrics` | Verified |
 | MLflow UI | `mlflow ui --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000` | `http://127.0.0.1:5000` | Backend and runs verified; start UI to browse them |
 | Streamlit | `streamlit run webapp/app.py --server.address 127.0.0.1 --server.port 8501` | `http://127.0.0.1:8501` | Code/config only; not retained as verified execution |
-| Prometheus UI | Compose or local Prometheus binary with `monitoring/prometheus.yml` | `http://127.0.0.1:9090` | Configured, not end-to-end verified |
-| Grafana | Compose | `http://127.0.0.1:3000` | Dashboard JSON exists; provisioning not end-to-end verified |
+| Prometheus UI | Compose with mounted config/rules | `http://127.0.0.1:9090` | Locally verified: ready, API target up, metric scraped, four rules loaded |
+| Grafana | Compose with file provisioning | `http://127.0.0.1:3000` | Locally verified: healthy database, datasource and dashboard provisioned |
 
 ## 6. Online and offline triggers
 
@@ -178,7 +178,7 @@ python scripts/build_submission_pdf.py
 | Online inference | A user/system sends `POST /predict` | Validate payload → shared online features → fitted preprocessing → champion prediction → risk band/version/latency → Prometheus metrics | Synchronous and implemented |
 | Interactive UI | Business user clicks Predict in Streamlit | UI forwards request to FastAPI | Implemented as prototype; UI launch not verified |
 | Offline batch scoring | Operator/scheduler invokes `python -m src.serving.batch_predict ...` | Load champion once → transform all rows → score in chunks → write campaign CSV | CLI implemented and executed; external scheduling not included |
-| Offline ingestion | New CRM CSV invokes `python -m src.data.ingestion --input ... --output ...` | Validate → merge → deduplicate by `customerID` → write table and JSON log | CLI and tests implemented; retain one real sample ingestion log |
+| Offline ingestion | New CRM CSV invokes `python -m src.data.ingestion --input ... --output ...` | Validate → merge → deduplicate by `customerID` → write table and JSON log | CLI and tests implemented; representative end-to-end replay executed and retained |
 | Offline monitoring | Operator/scheduler invokes `python -m src.monitoring.drift_detector` | Compare baseline/current distributions → write JSON drift report | Implemented and executed on a simulated split |
 | Retraining decision | Operator/scheduler invokes `python -m src.retraining.trigger` | Evaluate new-label count, AUC drop, drift and elapsed days → write decision log | Implemented and executed; does **not** start training |
 | Actual retraining | Human/CI invokes baseline/candidate training and evaluation commands | Produce MLflow runs/artifacts → apply validation guardrails → update champion manifest | Manual orchestration; cron value is configuration only |
@@ -212,11 +212,11 @@ python scripts/build_submission_pdf.py
 | `scripts/benchmark_latency.py` | Sequential/concurrent API load generator and JSON performance report |
 | `scripts/build_submission_pdf.py` | Builds the six-page consolidated assignment PDF from retained evidence |
 | `webapp/app.py` | Optional Streamlit client for single prediction, batch exploration and monitoring views |
-| `docker/Dockerfile.api`, `docker/docker-compose.yml` | Optional container prototypes for API/MLflow/Prometheus/Grafana |
+| `docker/Dockerfile.api`, `docker/docker-compose.yml` | Clean-built API and health-gated API/Prometheus/Grafana monitoring path; MLflow service separately configured |
 | `monitoring/prometheus.yml`, `monitoring/alerts.yml` | Scrape and alert-rule definitions |
 | `monitoring/grafana/dashboards/model_performance.json` | Optional dashboard definition |
 | `tests/unit/*.py` | 96 tests across data, features, models, evaluation, serving, drift, explanation and retraining |
-| `.github/workflows/ci.yml` | Optional CI prototype; currently needs repair before being called operational |
+| `../../.github/workflows/enterprise-mlops-churn-ci.yml` | Discoverable repository-root CI workflow with data quality, 100 unit tests, TensorFlow training, governed selection, four saved-artifact integration tests, Docker smoke test, and release summary; hosted run pending |
 
 ### Generated evidence and deployable artifacts
 
@@ -235,7 +235,7 @@ python scripts/build_submission_pdf.py
 | `artifacts/drift_reports/drift_report_test.json` | Executed six-feature drift report |
 | `artifacts/logs/*` | Quality and four retraining-scenario reports |
 | `coverage.xml`, `artifacts/test_summary.json` | Test and coverage evidence |
-| `output/pdf/enterprise_mlops_churn_submission.pdf` | Six-page, 1,500-word submission with repository hyperlink |
+| `output/pdf/enterprise_mlops_churn_submission.pdf` | Six-page, 1,523-word submission with repository hyperlink |
 
 ## 8. End-to-end project workflow
 
@@ -278,7 +278,7 @@ flowchart LR
 
     subgraph Observe[Observability and lifecycle]
         Metrics[Prometheus-format metrics\ncount · errors · latency]
-        PG[Prometheus / Grafana prototype]
+        PG[Prometheus / Grafana locally verified]
         Drift[Offline drift check\nPSI · KS · chi-squared]
         Feedback[Delayed-label AUC and business KPI\nplanned automation]
         Trigger{Retraining trigger\nlabels · AUC drop · drift · age}
@@ -365,13 +365,12 @@ sequenceDiagram
 
 ## 10. Necessary improvements, ordered by value
 
-1. **Create retained ingestion proof.** Run `src.data.ingestion` on a small representative incoming file and retain the resulting `ingestion_*.json`; do not overwrite the authoritative raw dataset.
-2. **Correct optional monitoring deployment before claiming it.** Mount `alerts.yml` into Prometheus, add Grafana datasource/dashboard provisioning, and validate a generated alert. The existing dashboard directory alone is not complete provisioning.
-3. **Fix Compose/README consistency.** The Compose file has no Streamlit service although README lists it; run it with `docker compose -f docker/docker-compose.yml up --build`, not an unspecified root-level Compose file.
-4. **Repair optional CI.** It references a missing `tests/integration/` directory, does not pass evaluation artifacts between jobs, and treats a valid “keep baseline” promotion decision as pipeline failure. Use module invocation so imports resolve consistently.
-5. **Automate delayed-label evaluation.** Join predictions to later outcomes, calculate windowed AUC/recall and campaign ROI, and feed the results into the retraining trigger.
-6. **Wire scheduling only if bonus production hardening is desired.** The configured weekly cron is not an active scheduler. Add an orchestrator job that runs quality → drift → trigger → training/evaluation only after approval.
-7. **Improve nominal encoding.** Replace arbitrary integer mappings for nominal categories with a fitted one-hot encoder or an explicit production-safe alternative, preserving unknown-category behavior.
-8. **Qualify optional claims.** Treat SHAP/LIME, Streamlit, Docker, CI/CD, Prometheus and Grafana as prototypes until each has a retained successful execution artifact or screenshot.
+1. **Enable external notification delivery only if required.** Add Alertmanager plus a governed email/webhook destination and secret handling; local Prometheus rule evaluation is already verified.
+2. **Fix Compose/README consistency.** The Compose file has no Streamlit service; the verified container boundary is API/Prometheus/Grafana, while MLflow remains separately configured.
+3. **Retain hosted CI evidence.** Run the implemented repository-root workflow on GitHub-hosted infrastructure and retain its successful run URL.
+4. **Automate delayed-label evaluation.** Join predictions to later outcomes, calculate windowed AUC/recall and campaign ROI, and feed the results into the retraining trigger.
+5. **Wire scheduling only if bonus production hardening is desired.** The configured weekly cron is not an active scheduler. Add an orchestrator job that runs quality → drift → trigger → training/evaluation only after approval.
+6. **Improve nominal encoding.** Replace arbitrary integer mappings for nominal categories with a fitted one-hot encoder or an explicit production-safe alternative, preserving unknown-category behavior.
+7. **Qualify optional claims.** Treat SHAP/LIME, Streamlit, hosted CI, external alert delivery, and cloud deployment as unverified until each has retained evidence.
 
 None of items 2–8 is required to demonstrate the core assignment's minimum functioning mini-production system; they improve evidence quality, bonus readiness and operational credibility.

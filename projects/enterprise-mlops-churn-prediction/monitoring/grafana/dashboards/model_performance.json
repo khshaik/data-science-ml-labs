@@ -1,15 +1,21 @@
 {
-  "dashboard": {
+    "id": null,
+    "uid": "churn-model-performance",
     "title": "Churn Prediction Model Performance",
     "tags": ["mlops", "churn", "monitoring"],
     "timezone": "browser",
+    "schemaVersion": 41,
+    "version": 1,
     "panels": [
       {
         "id": 1,
         "title": "Prediction Throughput",
-        "type": "graph",
+        "type": "timeseries",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
         "targets": [
           {
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "expr": "rate(predictions_total[5m])",
             "legendFormat": "Predictions/sec"
           }
@@ -18,17 +24,22 @@
       {
         "id": 2,
         "title": "Prediction Latency",
-        "type": "graph",
+        "type": "timeseries",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "expr": "histogram_quantile(0.50, rate(prediction_latency_seconds_bucket[5m]))",
             "legendFormat": "p50"
           },
           {
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "expr": "histogram_quantile(0.95, rate(prediction_latency_seconds_bucket[5m]))",
             "legendFormat": "p95"
           },
           {
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "expr": "histogram_quantile(0.99, rate(prediction_latency_seconds_bucket[5m]))",
             "legendFormat": "p99"
           }
@@ -37,11 +48,14 @@
       {
         "id": 3,
         "title": "Error Rate",
-        "type": "graph",
+        "type": "timeseries",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
         "targets": [
           {
-            "expr": "rate(prediction_errors_total[5m])",
-            "legendFormat": "Errors/sec"
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "expr": "rate(prediction_errors_total[5m]) / clamp_min(rate(prediction_requests_total[5m]), 0.001)",
+            "legendFormat": "Error ratio"
           }
         ]
       },
@@ -49,8 +63,11 @@
         "id": 4,
         "title": "Total Predictions",
         "type": "stat",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
         "targets": [
           {
+            "datasource": {"type": "prometheus", "uid": "prometheus"},
             "expr": "predictions_total",
             "legendFormat": "Total"
           }
@@ -62,5 +79,4 @@
       "from": "now-1h",
       "to": "now"
     }
-  }
 }

@@ -1,0 +1,41 @@
+{
+  "verification_timestamp": "2026-08-08T03:47:36.043737+00:00",
+  "status": "success",
+  "scope": "local Docker Compose monitoring path; external notifications excluded",
+  "api": {
+    "health_http_status": 200,
+    "model_loaded": true,
+    "model_version": "baseline_v1.0.0",
+    "prediction_http_status": 200,
+    "prediction_model_version": "baseline_v1.0.0"
+  },
+  "prometheus": {
+    "ready_http_status": 200,
+    "api_target_health": [
+      "up"
+    ],
+    "prediction_requests_total": 3.0,
+    "loaded_alert_rules": [
+      "APIDown",
+      "HighErrorRate",
+      "HighLatency",
+      "LowThroughput"
+    ],
+    "alert_rule_states": {
+      "HighErrorRate": "inactive",
+      "HighLatency": "inactive",
+      "LowThroughput": "firing",
+      "APIDown": "inactive"
+    }
+  },
+  "grafana": {
+    "health_http_status": 200,
+    "database": "ok",
+    "datasource_http_status": 200,
+    "datasource_uid": "prometheus",
+    "datasource_url": "http://prometheus:9090",
+    "dashboard_http_status": 200,
+    "dashboard_uid": "churn-model-performance",
+    "dashboard_title": "Churn Prediction Model Performance"
+  }
+}

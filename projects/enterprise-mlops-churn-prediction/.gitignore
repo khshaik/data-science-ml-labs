@@ -86,6 +86,7 @@ data/validation/*
 *.hdf5
 *.pickle
 *.pkl
+!artifacts/preprocessor.pkl
 !models/.gitkeep
 !data/.gitkeep
 
@@ -101,6 +102,8 @@ models/candidate/*.h5
 models/candidate/*.keras
 models/candidate/*.pb
 models/saved_models/*
+!models/baseline/logistic_regression_v1.pkl
+!models/candidate/neural_network_v1.h5
 !models/baseline/.gitkeep
 !models/candidate/.gitkeep
 
@@ -132,6 +135,9 @@ artifacts/plots/*.png
 artifacts/plots/*.jpg
 !artifacts/.gitkeep
 !artifacts/*/.gitkeep
+!artifacts/eval/baseline_evaluation.json
+!artifacts/eval/candidate_evaluation.json
+!artifacts/eval/model_comparison.json
 
 # Reports
 reports/
@@ -226,6 +232,10 @@ docker-compose.override.yml
 # Monitoring & Logs
 # ============================================
 logs/
+!artifacts/logs/
+artifacts/logs/*
+!artifacts/logs/.gitkeep
+!artifacts/logs/ingestion_20260808_082509.json
 *.log
 *.log.*
 npm-debug.log*
@@ -248,6 +258,7 @@ grafana_data/
 !CHANGELOG.md
 !docs/*.md
 !docs/**/*.md
+!artifacts/eval/model_comparison.md
 
 # Exclude generated documentation
 site/
@@ -351,6 +362,7 @@ implementation_strategy.py
 quickstart.txt
 test_coverage.txt
 testing_summary.py
+!QUICKSTART.txt
 
 # ============================================
 # Keep Essential Files

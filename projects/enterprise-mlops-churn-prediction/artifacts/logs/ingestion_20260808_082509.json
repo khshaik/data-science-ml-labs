@@ -1,0 +1,69 @@
+{
+  "status": "success",
+  "timestamp": "2026-08-08T08:25:09.334997",
+  "input_file": "data/raw/telco_customer_churn.csv",
+  "output_file": "data/training/representative_ingestion_v1.csv",
+  "new_rows": 7043,
+  "existing_rows": 0,
+  "total_rows": 7043,
+  "duplicates_removed": 0,
+  "quality_report": {
+    "timestamp": "2026-08-08T08:25:09.297530",
+    "num_rows": 7043,
+    "num_columns": 21,
+    "checks": {
+      "schema": {
+        "passed": true,
+        "issues": []
+      },
+      "missing_values": {
+        "passed": true,
+        "stats": {
+          "total_missing_rate": 0.0,
+          "columns_with_high_missing": {},
+          "threshold": 0.05,
+          "per_column_missing_rate": {
+            "customerID": 0.0,
+            "gender": 0.0,
+            "SeniorCitizen": 0.0,
+            "Partner": 0.0,
+            "Dependents": 0.0,
+            "tenure": 0.0,
+            "PhoneService": 0.0,
+            "MultipleLines": 0.0,
+            "InternetService": 0.0,
+            "OnlineSecurity": 0.0,
+            "OnlineBackup": 0.0,
+            "DeviceProtection": 0.0,
+            "TechSupport": 0.0,
+            "StreamingTV": 0.0,
+            "StreamingMovies": 0.0,
+            "Contract": 0.0,
+            "PaperlessBilling": 0.0,
+            "PaymentMethod": 0.0,
+            "MonthlyCharges": 0.0,
+            "TotalCharges": 0.0,
+            "Churn": 0.0
+          }
+        }
+      },
+      "data_ranges": {
+        "passed": true,
+        "issues": []
+      },
+      "duplicates": {
+        "passed": true,
+        "num_duplicates": 0
+      },
+      "consistency": {
+        "passed": true,
+        "warning": true,
+        "blocking": false,
+        "issues": [
+          "TotalCharges inconsistent with tenure*MonthlyCharges: 59 rows (>20% deviation)"
+        ]
+      }
+    },
+    "overall_passed": true
+  }
+}

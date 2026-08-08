@@ -1,0 +1,340 @@
+name: Enterprise Churn ML CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "projects/enterprise-mlops-churn-prediction/**"
+      - ".github/workflows/enterprise-mlops-churn-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "projects/enterprise-mlops-churn-prediction/**"
+      - ".github/workflows/enterprise-mlops-churn-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-churn-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_DIR: projects/enterprise-mlops-churn-prediction
+  PYTHON_VERSION: "3.9"
+
+defaults:
+  run:
+    working-directory: projects/enterprise-mlops-churn-prediction
+
+jobs:
+  data_quality:
+    name: Data quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run data-quality checks
+        run: python -m src.data.quality
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-quality-report
+          path: ${{ env.PROJECT_DIR }}/artifacts/logs/data_quality_report_*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  unit_tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: data_quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/unit -q \
+            --cov=src \
+            --cov-report=term \
+            --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.PROJECT_DIR }}/coverage.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  train_models:
+    name: Train baseline and TensorFlow candidate
+    runs-on: ubuntu-latest
+    needs: unit_tests
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Train baseline
+        run: python -m src.training.train --model baseline
+
+      - name: Train TensorFlow candidate
+        run: python -m src.training.train --model candidate
+
+      - name: Verify training outputs
+        run: |
+          test -f models/baseline/logistic_regression_v1.pkl
+          test -f models/candidate/neural_network_v1.h5
+          test -f artifacts/preprocessor.pkl
+          test -f artifacts/feature_threshold.json
+          test -f artifacts/eval/baseline_evaluation.json
+          test -f artifacts/eval/candidate_evaluation.json
+
+      - name: Upload training bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-bundle
+          path: |
+            ${{ env.PROJECT_DIR }}/models/
+            ${{ env.PROJECT_DIR }}/artifacts/preprocessor.pkl
+            ${{ env.PROJECT_DIR }}/artifacts/feature_threshold.json
+            ${{ env.PROJECT_DIR }}/artifacts/eval/baseline_evaluation.json
+            ${{ env.PROJECT_DIR }}/artifacts/eval/candidate_evaluation.json
+            ${{ env.PROJECT_DIR }}/mlflow.db
+          if-no-files-found: error
+          retention-days: 14
+
+  evaluate_models:
+    name: Evaluate and select champion
+    runs-on: ubuntu-latest
+    needs: train_models
+    outputs:
+      selected_model: ${{ steps.validate-selection.outputs.selected_model }}
+      should_promote: ${{ steps.validate-selection.outputs.should_promote }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Download training bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: training-bundle
+          path: ${{ env.PROJECT_DIR }}
+
+      - name: Remove checkout-time selection outputs
+        run: |
+          python -c "from pathlib import Path; [p.unlink(missing_ok=True) for p in [Path('artifacts/eval/model_comparison.json'), Path('artifacts/eval/model_comparison.md'), Path('models/current_best.json')]]"
+
+      - name: Apply promotion guardrails
+        id: evaluate
+        shell: bash
+        run: |
+          set +e
+          python -m src.training.evaluate
+          evaluation_status=$?
+          set -e
+
+          if [[ "$evaluation_status" -ne 0 && "$evaluation_status" -ne 1 ]]; then
+            echo "Unexpected evaluation exit status: $evaluation_status"
+            exit "$evaluation_status"
+          fi
+
+          echo "status=$evaluation_status" >> "$GITHUB_OUTPUT"
+
+      - name: Validate governed selection
+        id: validate-selection
+        env:
+          EVALUATION_STATUS: ${{ steps.evaluate.outputs.status }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          comparison_path = Path("artifacts/eval/model_comparison.json")
+          champion_path = Path("models/current_best.json")
+          if not comparison_path.exists() or not champion_path.exists():
+              raise SystemExit("Evaluation did not generate comparison and champion outputs")
+
+          comparison = json.loads(comparison_path.read_text())
+          champion = json.loads(champion_path.read_text())
+          decision = comparison["promotion_decision"]
+          should_promote = bool(decision["should_promote"])
+          expected_model = "candidate" if should_promote else "baseline"
+          expected_status = 0 if should_promote else 1
+          actual_status = int(os.environ["EVALUATION_STATUS"])
+
+          if actual_status != expected_status:
+              raise SystemExit(
+                  f"Exit status {actual_status} disagrees with promotion decision {should_promote}"
+              )
+          if decision["promoted_model"] != expected_model:
+              raise SystemExit("Comparison report contains an inconsistent promoted_model")
+          if champion["model_type"] != expected_model:
+              raise SystemExit("Champion manifest disagrees with the comparison report")
+          if not Path(champion["model_path"]).exists():
+              raise SystemExit(f"Selected model artifact is missing: {champion['model_path']}")
+
+          output_path = Path(os.environ["GITHUB_OUTPUT"])
+          with output_path.open("a") as output:
+              output.write(f"selected_model={expected_model}\n")
+              output.write(f"should_promote={str(should_promote).lower()}\n")
+
+          outcome = "PROMOTE CANDIDATE" if should_promote else "KEEP BASELINE"
+          print(f"Governed outcome accepted: {outcome}")
+          print(f"Reason: {decision['reason']}")
+          PY
+
+      - name: Upload evaluated serving bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: serving-bundle
+          path: |
+            ${{ env.PROJECT_DIR }}/models/
+            ${{ env.PROJECT_DIR }}/artifacts/preprocessor.pkl
+            ${{ env.PROJECT_DIR }}/artifacts/feature_threshold.json
+            ${{ env.PROJECT_DIR }}/artifacts/eval/
+            ${{ env.PROJECT_DIR }}/mlflow.db
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write workflow summary
+        run: |
+          {
+            echo "## Model governance result"
+            echo "- Selected model: ${{ steps.validate-selection.outputs.selected_model }}"
+            echo "- Candidate promoted: ${{ steps.validate-selection.outputs.should_promote }}"
+            echo "- Both promotion and baseline-retention are valid successful outcomes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  integration_tests:
+    name: Saved-artifact API integration tests
+    runs-on: ubuntu-latest
+    needs: evaluate_models
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ${{ env.PROJECT_DIR }}/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Download evaluated serving bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: serving-bundle
+          path: ${{ env.PROJECT_DIR }}
+
+      - name: Run integration tests
+        run: python -m pytest tests/integration -q
+
+  docker_build:
+    name: Build and smoke-test API image
+    runs-on: ubuntu-latest
+    needs: integration_tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download evaluated serving bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: serving-bundle
+          path: ${{ env.PROJECT_DIR }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -f docker/Dockerfile.api -t churn-prediction-api:ci .
+
+      - name: Start container
+        run: docker run -d -p 8000:8000 --name churn-api-ci churn-prediction-api:ci
+
+      - name: Wait for healthy API
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then
+              curl --fail http://127.0.0.1:8000/health
+              exit 0
+            fi
+            echo "Waiting for API startup ($attempt/30)"
+            sleep 2
+          done
+          docker logs churn-api-ci
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f churn-api-ci || true
+
+  release_summary:
+    name: Release-readiness summary
+    runs-on: ubuntu-latest
+    needs: [evaluate_models, docker_build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Record validated outcome
+        run: |
+          {
+            echo "## Enterprise churn release readiness"
+            echo "- Selected model: ${{ needs.evaluate_models.outputs.selected_model }}"
+            echo "- Candidate promoted: ${{ needs.evaluate_models.outputs.should_promote }}"
+            echo "- Unit, integration, and container checks completed."
+            echo "- This workflow validates readiness; it does not deploy externally."
+          } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: .

@@ -1,0 +1,40 @@
+{
+  "model_type": "candidate",
+  "timestamp": "2026-08-08T04:12:40.146360",
+  "validation_metrics": {
+    "dataset": "validation",
+    "accuracy": 0.7352732434350603,
+    "precision": 0.5008726003490401,
+    "recall": 0.767379679144385,
+    "f1": 0.6061246040126715,
+    "auc": 0.8299943165672066,
+    "confusion_matrix": [
+      [
+        749,
+        286
+      ],
+      [
+        87,
+        287
+      ]
+    ]
+  },
+  "test_metrics": {
+    "dataset": "test",
+    "accuracy": 0.7324343506032647,
+    "precision": 0.49747899159663866,
+    "recall": 0.7914438502673797,
+    "f1": 0.6109391124871001,
+    "auc": 0.836389470149061,
+    "confusion_matrix": [
+      [
+        736,
+        299
+      ],
+      [
+        78,
+        296
+      ]
+    ]
+  }
+}

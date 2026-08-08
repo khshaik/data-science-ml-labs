@@ -7,11 +7,8 @@ global:
   external_labels:
     monitor: 'churn-prediction-monitor'
 
-# Alerting configuration
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets: []
+# Rules are evaluated locally. External Alertmanager notification routing is
+# intentionally omitted until a destination and credentials are supplied.
 
 # Scrape configurations
 scrape_configs:
@@ -29,4 +26,4 @@ scrape_configs:
 
 # Alert rules
 rule_files:
-  - 'alerts.yml'
+  - '/etc/prometheus/alerts.yml'

@@ -319,7 +319,7 @@ def build():
     header(c, "Data, features, and reproducibility", 3)
     y = H - 78
     y = section(c, "Dataset and assumptions", y)
-    y = paragraph(c, "The public IBM-style Telco Customer Churn dataset contains customer demographics, services, contract and payment attributes, tenure, monthly charges, total charges, and the Churn label. Customer ID is retained for ingestion deduplication but removed before modelling. Blank TotalCharges values are converted to zero for new customers. The data is a cross-sectional teaching dataset: it demonstrates system design, but it is not a live telecom feed and does not establish causal drivers of churn.", 38, y)
+    y = paragraph(c, "This project uses IBM's Telco Customer Churn teaching sample, originally distributed as WA_Fn-UseC_-Telco-Customer-Churn.csv and catalogued at Kaggle under blastchar/telco-customer-churn. The evaluated 7,043-row file has SHA-256 88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a. Kaggle marks the data files © Original Authors, not with a standard open-data license; IBM's Apache-2.0 code-pattern license does not license the separately supplied CSV. This repository makes no relicensing claim and includes it for academic reproducibility. Customer ID is removed before modelling, and the fictional cross-sectional sample is not live telecom telemetry or evidence of causal churn drivers.", 38, y, 520, 8.2, 10.2)
     y -= 6
     rows = [["Engineered feature", "Construction", "Availability / skew control"],
         ["avg_monthly_charge", "TotalCharges / tenure", "same deterministic code"],
@@ -430,19 +430,19 @@ def build():
         "Metrics   GET http://127.0.0.1:8000/metrics                          -> verified",
         "Offline   python -m src.serving.batch_predict ... | python -m src.monitoring.drift_detector",
         "Lifecycle python -m src.retraining.trigger | python -m src.training.train --model candidate",
-        "Tests     ./venv/bin/python -m pytest tests/unit -q --cov=src -> 96 passed | 0 failed | 69%",
-        "Prototype Streamlit :8501 | Prometheus :9090 | Grafana :3000 (configured, not stack-verified)",
+        "Tests     pytest tests/unit -> 100 passed | pytest tests/integration -> 4 passed",
+        "Monitor   Prometheus :9090 | Grafana :3000 -> locally verified; notifications excluded",
     ])
     y -= 130
     y = section(c, "Alignment, trade-offs, and next work", y)
     y = bullets(c, [
-        "Core rubric alignment is complete across problem/data, modelling, inference, production considerations, and documentation. A retained end-to-end ingestion log is the main missing proof artifact.",
+        "Core rubric alignment is complete across problem/data, modelling, inference, production considerations, and documentation. A successful 7,043-row end-to-end ingestion replay and embedded quality report are retained as evidence.",
         "Recall is prioritized because missing a churner is assumed costlier than an unnecessary offer; threshold economics require real campaign costs.",
-        "Next: one-hot nominal features, delayed-label AUC and ROI automation, monitoring provisioning, CI repair, and external scheduling.",
-        "Prometheus/Grafana, Docker, CI, SHAP/LIME, and Streamlit remain prototypes rather than evidence of cloud production readiness.",
+        "Next: one-hot nominal features, delayed-label AUC and ROI automation, hosted CI evidence, external notifications, and scheduling.",
+        "Docker monitoring is locally verified; hosted CI, SHAP/LIME, Streamlit, notification delivery, and cloud deployment remain unverified.",
     ], 40, y, 500, 7.6, 9.0)
-    y = paragraph(c, "Ownership follows the signal: engineers receive availability, error, latency, schema, and freshness alerts; data scientists own drift, delayed-label evaluation, threshold review, and promotion; business teams receive churn-volume and campaign-outcome summaries. The current 96/96 tests and 69% coverage are verified evidence, not a claim of exhaustive production integration testing. Verification evidence is retained alongside source code.", 40, y, 500, 7.5, 9.0)
-    metric_card(c, 38, 58, 155, 65, "Unit tests", f"{test_result['tests_passed']}/{test_result['tests_collected']}", "all passing")
+    y = paragraph(c, "Ownership follows the signal: engineers receive availability, error, latency, schema, and freshness alerts; data scientists own drift, delayed-label evaluation, threshold review, and promotion; business teams receive churn-volume and campaign-outcome summaries. The current 104/104 tests (100 unit and 4 integration) and 69% unit-suite coverage are verified evidence, not a claim of exhaustive cloud production testing. Verification evidence is retained alongside source code.", 40, y, 500, 7.5, 9.0)
+    metric_card(c, 38, 58, 155, 65, "All tests", f"{test_result['tests_passed']}/{test_result['tests_collected']}", "100 unit + 4 integration")
     metric_card(c, 214, 58, 155, 65, "Source coverage", f"{test_result['source_coverage_percent']}%", "fresh project-local run", AMBER)
     metric_card(c, 390, 58, 155, 65, "Submission", "6 pages", "diagram + four evidence panels", GREEN)
     c.save()

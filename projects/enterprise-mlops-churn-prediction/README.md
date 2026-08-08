@@ -30,10 +30,10 @@ Supporting packages are pinned in [`requirements.txt`](requirements.txt), includ
 - **Champion:** `baseline_v1.0.0`, because candidate validation AUC decreased by `0.0054`.
 - **Inference:** verified FastAPI online scoring and chunked offline batch scoring share the fitted preprocessing artifacts and champion manifest.
 - **Operations:** Prometheus-format API metrics, data-quality checks, PSI/KS/chi-squared drift checks, and four-signal retraining decision logic.
-- **Verification:** 96/96 unit tests passed with 69% source coverage.
-- **Submission:** six-page, exactly 1,500-word PDF with repository link, end-to-end architecture, and four execution-evidence panels.
+- **Verification:** 100/100 unit tests and four saved-artifact integration tests passed with 69% source coverage.
+- **Submission:** six-page, 1,523-word PDF with repository link, end-to-end architecture, provenance/licensing disclosure, and four execution-evidence panels.
 
-Streamlit, SHAP/LIME, Docker, CI/CD, Prometheus UI, and Grafana are present as optional prototypes. They are not represented as fully deployed or end-to-end verified production services.
+The Docker API plus Prometheus/Grafana monitoring path is locally verified end to end: health-gated startup, a real prediction, scraped metrics, four loaded alert rules, provisioned datasource, and provisioned dashboard. External alert notifications are intentionally excluded. Streamlit and SHAP/LIME remain optional prototypes, and a hosted Actions run is still required before calling CI execution verified.
 
 ## Business problem and intended use
 
@@ -48,7 +48,10 @@ The output is decision support. The system does not autonomously apply offers or
 
 | Item | Value |
 |---|---|
-| Source | Public IBM-style Telco Customer Churn dataset |
+| Source | IBM Telco Customer Churn sample, originally distributed as `WA_Fn-UseC_-Telco-Customer-Churn.csv` |
+| Catalogue / access record | [Kaggle `blastchar/telco-customer-churn`](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) and [IBM archived code pattern](https://github.com/IBM/customer-churn-prediction) |
+| Data rights | Kaggle records “Data files © Original Authors”; no standard open-data license is asserted |
+| Evaluated-file SHA-256 | `88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a` |
 | Rows | 7,043 customers |
 | Raw columns | 21 |
 | Target | `Churn` (`Yes`/`No`) |
@@ -56,6 +59,8 @@ The output is decision support. The system does not autonomously apply offers or
 | Split | Stratified 60% train / 20% validation / 20% test |
 | Identifier handling | `customerID` retained for ingestion/output but excluded from model features |
 | Temporal limitation | No event timestamp; chronological splitting is therefore not applicable |
+
+The dataset is a fictional/cross-sectional IBM teaching sample, not observed production telemetry. The Apache-2.0 license on IBM's archived code pattern applies to that code pattern, not automatically to the CSV. This repository does not relicense the data; reuse or redistribution must follow the original rights holder's terms. See [Dataset provenance and license record](docs/dataset_provenance_and_license.md) for the full lineage, integrity digest, access date, and reproduction guidance.
 
 ## End-to-end architecture and user/system workflow
 
@@ -97,7 +102,7 @@ flowchart LR
 
     subgraph Operations[Monitoring and lifecycle]
         Metrics[Request, error, and latency metrics]
-        Dashboard[Prometheus / Grafana prototype]
+        Dashboard[Prometheus / Grafana locally verified]
         Drift[PSI, KS, and chi-squared drift]
         Feedback[Delayed-label performance]
         Trigger{Retraining decision}
@@ -205,6 +210,18 @@ The existing project-local virtual environment was reused; no new neural-network
 69% source coverage
 ```
 
+Saved-artifact integration verification:
+
+```bash
+./venv/bin/python -m pytest tests/integration -q
+```
+
+```text
+4 passed
+```
+
+The integration suite starts the FastAPI lifespan with the real champion, preprocessor, and feature threshold, then verifies `/health`, `/predict`, and `/metrics` without mocks.
+
 ### FastAPI verification
 
 ```text
@@ -299,8 +316,8 @@ mlflow ui \
 | API observability | `http://127.0.0.1:8000/metrics` | Verified |
 | MLflow | `http://127.0.0.1:5000` | Backend/runs verified; UI starts on demand |
 | Streamlit | `http://127.0.0.1:8501` | Prototype, not execution-verified |
-| Prometheus | `http://127.0.0.1:9090` | Configured, not end-to-end verified |
-| Grafana | `http://127.0.0.1:3000` | Dashboard JSON exists; provisioning not verified |
+| Prometheus | `http://127.0.0.1:9090` | Locally verified: API target up and four mounted rules loaded |
+| Grafana | `http://127.0.0.1:3000` | Locally verified: Prometheus datasource and churn dashboard provisioned |
 
 ## Online and offline triggers
 
@@ -308,7 +325,7 @@ mlflow ui \
 |---|---|---|---|
 | Online inference | `POST /predict` | Shared feature calculation, fitted preprocessing, champion prediction, risk/version response, metrics update | Synchronous and verified |
 | Offline batch scoring | `python -m src.serving.batch_predict ...` | Chunked scoring to campaign CSV | Executed; external scheduling not included |
-| Offline ingestion | `python -m src.data.ingestion ...` | Validate, merge, deduplicate and log incoming CSV | Unit-tested; retain one end-to-end ingestion log |
+| Offline ingestion | `python -m src.data.ingestion ...` | Validate, merge, deduplicate and log incoming CSV | Executed; retained audit log records a successful 7,043-row reproducibility replay |
 | Offline monitoring | `python -m src.monitoring.drift_detector` | PSI, KS and chi-squared report | Executed on simulated baseline/current split |
 | Retraining eligibility | `python -m src.retraining.trigger` | Check label count, AUC drop, drift and model age | Logs decision; does not start training |
 | Actual retraining | Human or CI invokes train/evaluate | Train both versions, compare validation, update champion | Weekly cron is policy configuration only |
@@ -332,7 +349,7 @@ mlflow ui \
 | `src/retraining/trigger.py` | Four-signal retraining eligibility | Produces decision logs; no auto-training |
 | `scripts/benchmark_latency.py` | Sequential/concurrent API load test | Produces benchmark JSON |
 | `scripts/build_submission_pdf.py` | Reproducible six-page report generation | Reads retained evidence artifacts |
-| `tests/unit/*.py` | 96 unit tests over core components | Produces coverage evidence |
+| `tests/unit/*.py` | 100 unit tests over core and monitoring contracts | Produces coverage evidence |
 
 ## Project structure
 
@@ -352,8 +369,8 @@ enterprise-mlops-churn-prediction/
 ├── artifacts/                 # Reports, logs, benchmarks and predictions
 ├── models/                    # Saved models and champion manifest
 ├── mlruns/ and mlflow.db      # Experiment tracking evidence
-├── monitoring/                # Prometheus/Grafana prototype configs
-├── docker/                    # Optional container prototype
+├── monitoring/                # Verified Prometheus/Grafana configs and provisioning
+├── docker/                    # Clean-built API and locally verified monitoring stack
 ├── webapp/                    # Optional Streamlit prototype
 ├── scripts/                   # Benchmark and PDF builder
 ├── docs/                      # Design, architecture and alignment audit
@@ -368,7 +385,7 @@ enterprise-mlops-churn-prediction/
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-The current Compose file defines API, MLflow, Prometheus, and Grafana. It does not define Streamlit. Prometheus alert-rule mounting and Grafana datasource/dashboard provisioning require completion before the stack is described as operational.
+The current Compose file defines API, MLflow, Prometheus, and Grafana. The API/Prometheus/Grafana subset was clean-built and locally verified on 08 August 2026; `artifacts/monitoring/stack_verification.json` retains the result. The MLflow Compose service and external notification delivery were not part of that verification, and Compose does not define Streamlit.
 
 ### Streamlit
 
@@ -380,13 +397,12 @@ streamlit run webapp/app.py \
 
 ## Necessary improvements
 
-1. Retain one real `ingestion_*.json` proof from a representative incoming batch.
-2. Add Prometheus alert-rule mounting and Grafana datasource/dashboard provisioning.
-3. Align Compose and documentation if Streamlit should be part of the container stack.
-4. Repair optional CI artifact passing, nonexistent integration-test references, and handling of a valid “keep baseline” outcome.
-5. Automate delayed-label AUC/recall and campaign-ROI collection.
-6. Replace arbitrary integer mappings for nominal features with a fitted one-hot or another unknown-safe encoder.
-7. Add external scheduling only if automated retraining is required.
+1. Add an Alertmanager destination only if external alert delivery is required.
+2. Align Compose and documentation if Streamlit should be part of the container stack.
+3. Run the implemented CI workflow on GitHub-hosted infrastructure and retain the successful run URL.
+4. Automate delayed-label AUC/recall and campaign-ROI collection.
+5. Replace arbitrary integer mappings for nominal features with a fitted one-hot or another unknown-safe encoder.
+6. Add external scheduling only if automated retraining is required.
 
 ## Documentation and retained evidence
 
