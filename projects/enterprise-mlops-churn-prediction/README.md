@@ -44,11 +44,11 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 
 ## End-to-end architecture and user/system workflow
 
-### Governed ML lifecycle summary
+### Mini-production architecture summary
 
-![Enterprise Telco Churn ML lifecycle: Data Sources to Pipelines, Features, Training, optional Model Registry, Serving, Monitoring, and Retraining](docs/architecture_diagram.svg)
+![Yellow-accented Telco Churn mini-production architecture connecting CRM ingestion, shared features, training and champion artifacts with online and batch inference, monitoring, and retraining](docs/architecture_diagram.svg)
 
-The lifecycle summary condenses the same implementation into eight review stages:
+This restored architecture view emphasizes training-serving consistency and the governed feedback path. The implementation around it includes:
 
 - **Data Sources:** the identified IBM teaching dataset represents a CRM/customer snapshot; future labeled batches can enter through the same ingestion interface.
 - **Pipelines:** incoming CSV data is schema-checked, quality-checked, merged, deduplicated by `customerID`, and logged before it can become training input.
@@ -564,7 +564,7 @@ This is a verified mini-production system, not a claim of a fully managed cloud 
 ## Retained evidence index
 
 - [Detailed end-to-end user/system workflow](docs/mermaid-diagram.png)
-- [Governed ML lifecycle summary](docs/architecture_diagram.svg)
+- [Mini-production architecture summary](docs/architecture_diagram.svg)
 - [Dataset provenance and license record](docs/dataset_provenance_and_license.md)
 - [Representative ingestion audit](artifacts/logs/ingestion_20260808_082509.json)
 - [Baseline evaluation](artifacts/eval/baseline_evaluation.json)
