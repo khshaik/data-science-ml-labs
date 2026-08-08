@@ -1,245 +1,388 @@
 # Enterprise MLOps Churn Prediction System
 
-> Verified mini-production ML prototype for telecommunications customer churn prediction
-
-## Verified libraries and runtime
+> A reproducible mini-production machine-learning system for telecommunications customer-churn prediction, covering governed data ingestion, leakage-safe feature engineering, TensorFlow candidate training, champion selection, online and batch serving, Docker deployment, observability, drift detection, and retraining decisions.
 
 [![Python](https://img.shields.io/badge/Python-3.9.6-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13.0-FF6F00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
-[![Keras](https://img.shields.io/badge/Keras-2.13.1-D00000?logo=keras&logoColor=white)](https://keras.io/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3.0-F7931E?logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
-[![pandas](https://img.shields.io/badge/pandas-2.0.3-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
-[![NumPy](https://img.shields.io/badge/NumPy-1.24.3-4D77CF?logo=numpy&logoColor=white)](https://numpy.org/)
 [![MLflow](https://img.shields.io/badge/MLflow-2.7.1-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.103.1-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![pytest](https://img.shields.io/badge/pytest-7.4.2-0A9EDC?logo=pytest&logoColor=white)](https://pytest.org/)
-[![Prometheus Client](https://img.shields.io/badge/Prometheus_Client-0.17.1-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-verified-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-provisioned-F46800?logo=grafana&logoColor=white)](https://grafana.com/)
+[![Tests](https://img.shields.io/badge/tests-104%20passed-2EA44F)](artifacts/test_summary.json)
 
-Supporting packages are pinned in [`requirements.txt`](requirements.txt), including SciPy 1.11.2, Uvicorn 0.23.2, Pydantic 1.x, SHAP 0.42.1, LIME 0.2.0.1, Streamlit 1.27.0, Plotly 5.17.0, imbalanced-learn 0.11.0, and pytest-cov 4.1.0.
+## Executive overview
 
-## Project status at a glance
+The system predicts whether a customer is likely to churn (`Churn = Yes`) and supports two human-reviewed retention workflows:
 
-- **Problem and data:** binary churn classification over 7,043 customers and 21 raw columns.
-- **Leakage-safe split:** raw stratified 60/20/20 train/validation/test split before fitting transformations or data-derived features.
-- **Shared features:** six engineered features are used by training, online serving, and batch scoring.
-- **Train-only statistic:** the high-value-customer threshold is fitted only on training rows and persisted as `89.75`.
-- **Baseline:** balanced Logistic Regression.
-- **Candidate:** **TensorFlow 2.13** neural network `[64, 32, 16]`; it was not replaced with scikit-learn `MLPClassifier`.
-- **Candidate safeguards:** balanced class weights, deterministic seed 42, dropout, early stopping, and learning-rate reduction.
-- **Model governance:** validation metrics determine promotion; test metrics remain a separate final estimate.
-- **Champion:** `baseline_v1.0.0`, because candidate validation AUC decreased by `0.0054`.
-- **Inference:** verified FastAPI online scoring and chunked offline batch scoring share the fitted preprocessing artifacts and champion manifest.
-- **Operations:** Prometheus-format API metrics, data-quality checks, PSI/KS/chi-squared drift checks, and four-signal retraining decision logic.
-- **Verification:** 100/100 unit tests and four saved-artifact integration tests passed with 69% source coverage.
-- **Submission:** six-page, 1,523-word PDF with repository link, end-to-end architecture, provenance/licensing disclosure, and four execution-evidence panels.
+1. **Online decision support:** a customer-service application requests a low-latency prediction from FastAPI.
+2. **Offline campaign planning:** a marketing workflow scores a customer CSV in chunks and writes probability, class, risk band, and model version.
 
-The Docker API plus Prometheus/Grafana monitoring path is locally verified end to end: health-gated startup, a real prediction, scraped metrics, four loaded alert rules, provisioned datasource, and provisioned dashboard. External alert notifications are intentionally excluded. Streamlit and SHAP/LIME remain optional prototypes, and a hosted Actions run is still required before calling CI execution verified.
+The implementation deliberately extends beyond a training notebook. It preserves the artifacts required to reproduce and serve the selected model, validates incoming data, keeps training and inference transformations consistent, compares a simple baseline with a TensorFlow neural network under explicit promotion rules, exposes system metrics, provisions Prometheus and Grafana, detects feature drift, and records why retraining should or should not occur.
 
-## Business problem and intended use
+The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the absolute validation AUC and recall thresholds, but its validation AUC was `0.0054` below the baseline. Retaining the simpler model is therefore the intended governed outcome—not a failed training run.
 
-The positive class is `Churn = Yes`. The model supports two human-reviewed retention workflows:
+### Current implementation state
 
-1. A customer-service agent requests a real-time risk score during an interaction.
-2. A marketing team scores the customer base offline for periodic campaign selection.
+| Capability | State | Retained evidence or implementation |
+|---|---|---|
+| Source dataset identity, provenance, checksum, and rights | **Implemented** | [`docs/dataset_provenance_and_license.md`](docs/dataset_provenance_and_license.md) |
+| Batch ingestion, validation, merge, and deduplication | **Implemented and executed** | [`src/data/ingestion.py`](src/data/ingestion.py), [`artifacts/logs/ingestion_20260808_082509.json`](artifacts/logs/ingestion_20260808_082509.json) |
+| Leakage-safe split and fitted preprocessing | **Implemented and persisted** | [`src/data/preprocessing.py`](src/data/preprocessing.py), [`artifacts/preprocessor.pkl`](artifacts/preprocessor.pkl) |
+| Offline/online feature consistency | **Implemented and persisted** | [`src/features/engineering.py`](src/features/engineering.py), [`artifacts/feature_threshold.json`](artifacts/feature_threshold.json) |
+| Baseline and TensorFlow candidate training | **Implemented and executed** | [`models/baseline/logistic_regression_v1.pkl`](models/baseline/logistic_regression_v1.pkl), [`models/candidate/neural_network_v1.h5`](models/candidate/neural_network_v1.h5) |
+| Evaluation and governed champion selection | **Implemented and executed** | [`artifacts/eval/model_comparison.md`](artifacts/eval/model_comparison.md), [`models/current_best.json`](models/current_best.json) |
+| Fresh-clone API startup from saved artifacts | **Implemented and integration-tested** | Real saved-artifact startup tests in [`tests/integration/test_saved_artifact_api.py`](tests/integration/test_saved_artifact_api.py) |
+| Online REST and offline batch inference | **Implemented and executed** | [`src/serving/api.py`](src/serving/api.py), [`src/serving/batch_predict.py`](src/serving/batch_predict.py) |
+| Docker API runtime boundary and health checks | **Implemented and clean-built locally** | [`docker/Dockerfile.api`](docker/Dockerfile.api), [`docker/requirements.api.txt`](docker/requirements.api.txt) |
+| Prometheus rules and Grafana provisioning | **Implemented and verified end to end** | [`artifacts/monitoring/stack_verification.json`](artifacts/monitoring/stack_verification.json) |
+| External notification delivery | **Intentionally not enabled** | Alert rules evaluate locally; no Alertmanager destination or external credentials are configured |
+| Drift detection and retraining eligibility | **Implemented and locally exercised** | [`src/monitoring/drift_detector.py`](src/monitoring/drift_detector.py), [`src/retraining/trigger.py`](src/retraining/trigger.py) |
+| GitHub Actions lifecycle workflow | **Implemented; hosted run pending** | [`.github/workflows/enterprise-mlops-churn-ci.yml`](../../.github/workflows/enterprise-mlops-churn-ci.yml) |
+| Automated production deployment or retraining | **Outside current scope** | CI validates readiness; a human or CI invocation starts training and no external environment is mutated automatically |
 
-The output is decision support. The system does not autonomously apply offers or make adverse customer decisions.
+## Architecture
 
-### Dataset
+![Enterprise Telco Churn ML lifecycle: Data Sources to Pipelines, Features, Training, optional Model Registry, Serving, Monitoring, and Retraining](docs/architecture_diagram.svg)
 
-| Item | Value |
+The diagram shows the primary lifecycle. The implementation uses a deliberately small production architecture:
+
+- **Data Sources:** the identified IBM teaching dataset represents a CRM/customer snapshot; future labeled batches can enter through the same ingestion interface.
+- **Pipelines:** incoming CSV data is schema-checked, quality-checked, merged, deduplicated by `customerID`, and logged before it can become training input.
+- **Features:** one shared feature module and one persisted preprocessing object are reused across training, API serving, and batch scoring.
+- **Training:** a balanced Logistic Regression baseline is evaluated against a TensorFlow/Keras neural network.
+- **Model Registry (optional):** MLflow retains run metadata and artifacts; the Git-tracked champion manifest is the deterministic serving contract. A remote registry is not required for this prototype.
+- **Serving:** FastAPI handles synchronous requests; the batch scorer handles file-oriented campaign inference. Both load the same champion bundle.
+- **Monitoring:** API counters and latency histograms are scraped by Prometheus; Grafana visualizes operational signals; separate statistical checks detect data drift.
+- **Retraining:** new labeled volume, AUC degradation, feature drift, and model age produce an eligibility decision. Retraining and promotion remain governed actions.
+
+## Complete ML lifecycle
+
+### 1. Business objective and decision boundary
+
+The positive class is customer churn. A prediction response contains:
+
+- churn probability in `[0, 1]`;
+- binary prediction (`Yes` or `No`) using a `0.5` decision threshold;
+- risk band (`Low < 0.4`, `Medium 0.4–0.7`, `High ≥ 0.7`);
+- champion model version;
+- request latency and timestamp.
+
+Predictions are **decision support**, not autonomous decisions. Retention offers or other customer actions require human or downstream business approval. `customerID` is retained only for ingestion, deduplication, and output association; it is excluded from model features.
+
+### 2. Dataset provenance, integrity, and licensing
+
+| Property | Recorded value |
 |---|---|
-| Source | IBM Telco Customer Churn sample, originally distributed as `WA_Fn-UseC_-Telco-Customer-Churn.csv` |
-| Catalogue / access record | [Kaggle `blastchar/telco-customer-churn`](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) and [IBM archived code pattern](https://github.com/IBM/customer-churn-prediction) |
-| Data rights | Kaggle records “Data files © Original Authors”; no standard open-data license is asserted |
-| Evaluated-file SHA-256 | `88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a` |
-| Rows | 7,043 customers |
-| Raw columns | 21 |
-| Target | `Churn` (`Yes`/`No`) |
+| Dataset | IBM Telco Customer Churn teaching sample |
+| Original filename | `WA_Fn-UseC_-Telco-Customer-Churn.csv` |
+| Repository path | [`data/raw/telco_customer_churn.csv`](data/raw/telco_customer_churn.csv) |
+| Shape | 7,043 rows × 21 raw columns, including `Churn` |
 | Positive-class share | Approximately 26.5% |
-| Split | Stratified 60% train / 20% validation / 20% test |
-| Identifier handling | `customerID` retained for ingestion/output but excluded from model features |
-| Temporal limitation | No event timestamp; chronological splitting is therefore not applicable |
+| Evaluated-file SHA-256 | `88be4b93fbe0cc83421af1c503794c97c342eca914c1576db7c276e61d61358a` |
+| Source lineage | IBM sample context → IBM archived code pattern → Kaggle catalogue record → checksum-identified project copy |
+| Rights statement | Kaggle records “Data files © Original Authors”; no standard open-data license is asserted |
+| Temporal limitation | The sample has no event timestamp, so chronological splitting and point-in-time joins cannot be demonstrated |
 
-The dataset is a fictional/cross-sectional IBM teaching sample, not observed production telemetry. The Apache-2.0 license on IBM's archived code pattern applies to that code pattern, not automatically to the CSV. This repository does not relicense the data; reuse or redistribution must follow the original rights holder's terms. See [Dataset provenance and license record](docs/dataset_provenance_and_license.md) for the full lineage, integrity digest, access date, and reproduction guidance.
+The Apache-2.0 license on IBM's archived **code pattern** does not automatically license the CSV. This repository does not relicense the data. Academic reproducibility does not remove the obligation to review the current source terms before redistribution or non-academic use. The complete acquisition limitation, access date, rights interpretation, and integrity procedure are recorded in [`docs/dataset_provenance_and_license.md`](docs/dataset_provenance_and_license.md).
 
-## End-to-end architecture and user/system workflow
+Verify the evaluated bytes with:
 
-```mermaid
-flowchart LR
-    subgraph Users[Users and external systems]
-        CRM[CRM / incoming CSV]
-        Agent[Customer-service agent]
-        Marketing[Marketing analyst]
-        Operator[ML engineer or scheduler]
-        Labels[Delayed churn labels]
-    end
-
-    subgraph Data[Data and shared features]
-        Ingest[Ingest, validate, merge, deduplicate]
-        Store[(Raw / training data)]
-        Split[Raw stratified 60/20/20 split]
-        Features[Six shared offline/online features]
-        Preprocess[Fitted encoding and scaling]
-        FeatureArtifacts[(Threshold and preprocessor)]
-    end
-
-    subgraph Training[Offline training and governance]
-        Baseline[Balanced Logistic Regression]
-        Candidate[TensorFlow neural network]
-        MLflow[(MLflow runs and artifacts)]
-        Evaluate[Validation guardrails]
-        Champion[(current_best.json)]
-        Test[Separate test report]
-    end
-
-    subgraph Serving[Online and offline inference]
-        UI[Optional Streamlit client]
-        API[FastAPI /predict /health /metrics]
-        Batch[Chunked batch scorer]
-        Result[Probability, class, risk, version]
-        Campaign[(Campaign predictions CSV)]
-    end
-
-    subgraph Operations[Monitoring and lifecycle]
-        Metrics[Request, error, and latency metrics]
-        Dashboard[Prometheus / Grafana locally verified]
-        Drift[PSI, KS, and chi-squared drift]
-        Feedback[Delayed-label performance]
-        Trigger{Retraining decision}
-        Alert[Alert and incident response]
-    end
-
-    CRM --> Ingest --> Store --> Split --> Features --> Preprocess
-    Features --> FeatureArtifacts
-    Preprocess --> FeatureArtifacts
-    Preprocess --> Baseline
-    Preprocess --> Candidate
-    Baseline --> MLflow
-    Candidate --> MLflow
-    Baseline --> Evaluate
-    Candidate --> Evaluate
-    Evaluate --> Champion
-    Evaluate --> Test
-
-    Agent --> API
-    Marketing --> UI --> API
-    Operator --> Batch
-    Store --> Batch
-    FeatureArtifacts --> API
-    FeatureArtifacts --> Batch
-    Champion --> API
-    Champion --> Batch
-    API --> Result --> Agent
-    Batch --> Campaign --> Marketing
-
-    API --> Metrics --> Dashboard --> Alert
-    Store --> Drift --> Trigger
-    Labels --> Feedback --> Trigger
-    Metrics --> Trigger
-    Trigger -- "eligible: human or CI starts training" --> Split
-    Trigger --> Alert
+```bash
+shasum -a 256 data/raw/telco_customer_churn.csv
 ```
 
-## Assignment alignment
+### 3. Batch ingestion and retained audit evidence
 
-The implementation was cross-verified against `GradedAssignment/Instructions.txt`, `GradedAssignment/Criteria.png`, and `GradedAssignment/Notes.txt`. The originally referenced `data-science-ml-labs/@notes.txt` does not exist; `GradedAssignment/Notes.txt` contains the applicable checklist and matching rubric.
+[`src/data/ingestion.py`](src/data/ingestion.py) implements a file-based production ingestion boundary:
 
-| Rubric criterion | Implemented evidence | Alignment |
+1. read the incoming CSV;
+2. apply schema, missingness, range, duplicate, and consistency checks;
+3. abort before writing if blocking checks fail;
+4. load an existing training file when present;
+5. append the new batch and retain the latest record for duplicate `customerID` values;
+6. write the merged training data; and
+7. persist a timestamped JSON audit summary.
+
+The representative replay in [`artifacts/logs/ingestion_20260808_082509.json`](artifacts/logs/ingestion_20260808_082509.json) is Git-retained evidence of the complete path:
+
+| Ingestion result | Value |
+|---|---:|
+| Status | `success` |
+| Input rows | 7,043 |
+| Existing rows | 0 |
+| Output rows | 7,043 |
+| Duplicate customer IDs removed | 0 |
+| Schema check | Passed |
+| Missing-value check | Passed; total missing rate `0.0` |
+| Range check | Passed |
+| Duplicate-row check | Passed |
+| Overall quality decision | Passed |
+
+The source contains 59 historical `TotalCharges` values that differ from `tenure × MonthlyCharges` by more than 20%. This is retained as a **non-blocking consistency warning**, because historical accumulated charges can legitimately differ from the current monthly charge multiplied by tenure.
+
+Reproduce the ingestion path without modifying the raw source:
+
+```bash
+python -m src.data.ingestion \
+  --input data/raw/telco_customer_churn.csv \
+  --output data/training/representative_ingestion_v1.csv
+```
+
+### 4. Leakage-safe splitting, features, and preprocessing
+
+The raw dataset is split first with a fixed random seed and target stratification:
+
+| Split | Share | Purpose |
+|---|---:|---|
+| Training | 60% | Fit feature statistics, encoders, scaler, and model parameters |
+| Validation | 20% | Compare baseline and candidate and decide promotion |
+| Test | 20% | Produce a final estimate after the selection policy is defined |
+
+This ordering prevents the validation and test rows from influencing the fitted high-value threshold, encoders, or scaler.
+
+Six business features are defined once in [`src/features/engineering.py`](src/features/engineering.py):
+
+| Engineered feature | Definition | Consistency control |
 |---|---|---|
-| Problem Understanding & Data | Business use case, target, inputs, 7,043-row dataset, intended online/batch use, leakage-safe 60/20/20 split | Core complete |
-| Model Development & Correctness | Balanced baseline, TensorFlow candidate, fitted preprocessing, appropriate metrics, validation selection | Core complete |
-| Production System Design | Verified FastAPI prediction and 7,043-row batch scoring paths using one champion manifest | Core complete |
-| Evaluation & Production Considerations | Imbalance handling, latency/throughput, metrics, quality/drift checks, incident and retraining logic | Core complete |
-| Documentation & Presentation | Six-page PDF, repository link, architecture, implementation/results and four evidence panels | Complete |
+| `avg_monthly_charge` | `TotalCharges / tenure`; current monthly charge is used when tenure is zero | Same deterministic function offline and online |
+| `service_adoption_score` | Count of six subscribed add-on services | Same fixed service list |
+| `tenure_category` | Fixed bins: 0–12, 13–24, 25–48, and 48+ months | Same bin boundaries |
+| `payment_risk_flag` | `1` for electronic check, otherwise `0` | Same exact mapping |
+| `contract_stability_score` | Month-to-month=`1`, one-year=`2`, two-year=`3` | Same exact mapping |
+| `high_value_customer` | `MonthlyCharges` above the training-set 75th percentile | Fitted value `89.75` persisted in [`artifacts/feature_threshold.json`](artifacts/feature_threshold.json) |
 
-For the complete requirement-to-evidence audit, see [Assignment Alignment and Workflow](docs/assignment_alignment_and_workflow.md).
+Categorical encoders, the numerical scaler, and the final feature order are fitted only on training rows and saved together in [`artifacts/preprocessor.pkl`](artifacts/preprocessor.pkl). Training, FastAPI, batch inference, and saved-artifact integration tests all load this same object. This is the project’s lightweight alternative to a full feature store and prevents duplicated training-serving transformation logic.
 
-## Model development and measured results
+### 5. Training and experiment tracking
 
-### Engineered features
+[`src/training/train.py`](src/training/train.py) coordinates load → raw split → feature creation → preprocessing → training → validation/test evaluation → persistence → MLflow logging.
 
-| Feature | Construction | Skew control |
-|---|---|---|
-| `avg_monthly_charge` | `TotalCharges / tenure` | Shared deterministic implementation |
-| `service_adoption_score` | Count of six add-on services | Shared deterministic implementation |
-| `tenure_category` | Fixed tenure bands | Fixed boundaries |
-| `payment_risk_flag` | Electronic-check indicator | Fixed mapping |
-| `contract_stability_score` | Month-to-month=1, one-year=2, two-year=3 | Fixed mapping |
-| `high_value_customer` | `MonthlyCharges > training p75` | Persisted train-only threshold |
+| Model | Implementation | Production-relevant controls | Saved artifact |
+|---|---|---|---|
+| Baseline | Balanced scikit-learn Logistic Regression | `class_weight="balanced"`, seed 42, simple and interpretable decision boundary | [`models/baseline/logistic_regression_v1.pkl`](models/baseline/logistic_regression_v1.pkl) |
+| Candidate | TensorFlow/Keras ANN with hidden layers `[64, 32, 16]` | Balanced class weights, seed 42, dropout `0.3`, early stopping, and learning-rate reduction | [`models/candidate/neural_network_v1.h5`](models/candidate/neural_network_v1.h5) |
 
-`src/features/engineering.py` and the fitted `artifacts/preprocessor.pkl` are shared by training, FastAPI, and batch scoring to reduce training-serving skew.
+TensorFlow 2.13 is used for the neural-network candidate; the candidate was not substituted with scikit-learn `MLPClassifier`. The local MLflow backend records two finished runs and their parameters, metrics, preprocessing artifacts, and model artifacts. For this mini-system, [`models/current_best.json`](models/current_best.json) provides the small, explicit registry-to-serving contract.
 
-### Models and promotion guardrails
+### 6. Evaluation, promotion, and champion governance
 
-The baseline uses balanced Logistic Regression. The candidate uses TensorFlow/Keras with hidden layers `[64, 32, 16]`, dropout `0.3`, balanced class weights, deterministic seed `42`, early stopping, and learning-rate reduction.
+Promotion uses validation metrics only. Test metrics are retained separately so that model selection does not optimize against the final test estimate.
 
-Promotion requires:
+Promotion requires all of the following:
 
 - candidate validation AUC ≥ `0.80`;
 - candidate validation recall ≥ `0.75`; and
 - candidate validation AUC gain over the baseline ≥ `0.0`.
 
-| Dataset / metric | Baseline | TensorFlow candidate |
+| Dataset / metric | Baseline | TensorFlow candidate | Difference (candidate − baseline) |
+|---|---:|---:|---:|
+| Validation accuracy | 0.7488 | 0.7353 | -0.0135 |
+| Validation precision | 0.5174 | 0.5009 | -0.0165 |
+| Validation recall | 0.7941 | 0.7674 | -0.0267 |
+| Validation F1 | 0.6266 | 0.6061 | -0.0205 |
+| **Validation AUC** | **0.8354** | **0.8300** | **-0.0054** |
+| Final test recall | 0.7807 | 0.7914 | +0.0107 |
+| Final test AUC | 0.8429 | 0.8364 | -0.0065 |
+
+The candidate passes the absolute AUC and recall floors but does not improve validation AUC. The governed decision is therefore **KEEP BASELINE**, recorded consistently in:
+
+- [`artifacts/eval/baseline_evaluation.json`](artifacts/eval/baseline_evaluation.json);
+- [`artifacts/eval/candidate_evaluation.json`](artifacts/eval/candidate_evaluation.json);
+- [`artifacts/eval/model_comparison.json`](artifacts/eval/model_comparison.json);
+- [`artifacts/eval/model_comparison.md`](artifacts/eval/model_comparison.md); and
+- [`models/current_best.json`](models/current_best.json).
+
+The evaluation command intentionally returns a distinct non-zero outcome when the candidate is rejected. The CI workflow now validates that `KEEP BASELINE` is a legitimate governed result and continues with the selected baseline rather than treating it as an unexpected failure.
+
+### 7. Serving: online and batch inference
+
+#### Online FastAPI service
+
+At startup, [`src/serving/api.py`](src/serving/api.py) loads the champion manifest, selected model, persisted preprocessor, persisted feature threshold, and optional explainer. The core endpoints are:
+
+| Endpoint | Responsibility |
+|---|---|
+| `GET /` | Service metadata and endpoint discovery |
+| `GET /health` | Readiness, model-loaded state, and champion version |
+| `POST /predict` | Input validation, shared feature transformation, champion inference, risk band, latency, and version |
+| `GET /metrics` | Prometheus-format request, prediction, error, and latency metrics |
+| `POST /explain` | Optional explanation path when an explainer is available |
+
+The Pydantic contract validates required fields and numerical ranges before inference. A retained verification request produced HTTP `200`, probability `0.760917`, prediction `Yes`, risk `High`, and model version `baseline_v1.0.0`.
+
+#### Offline batch scorer
+
+[`src/serving/batch_predict.py`](src/serving/batch_predict.py) loads the same champion bundle and scores CSV data in configurable chunks. It preserves `customerID` for business association and writes churn probability, prediction, risk band, model version, and scoring timestamp. This provides high-throughput campaign scoring without creating a separate transformation path.
+
+### 8. Dockerized runtime and fresh-clone readiness
+
+The previously missing runtime bundle is now Git-retained. A fresh clone contains:
+
+- the baseline model;
+- the TensorFlow candidate model and metadata;
+- the fitted preprocessor;
+- the fitted feature threshold;
+- validation and test evaluation reports;
+- the comparison and champion decision;
+- the representative ingestion log; and
+- monitoring verification evidence.
+
+[`docker/Dockerfile.api`](docker/Dockerfile.api) copies these artifacts into the image. [`docker/requirements.api.txt`](docker/requirements.api.txt) defines a TensorFlow-only serving boundary and deliberately excludes training-only or optional packages such as MLflow, Streamlit, SHAP, and LIME. The container exposes port `8000` and includes an API health check.
+
+From a fresh clone, start the locally verified API and observability path:
+
+```bash
+cd projects/enterprise-mlops-churn-prediction
+docker compose -f docker/docker-compose.yml up --build api prometheus grafana
+```
+
+Then verify the complete path in another terminal:
+
+```bash
+python scripts/verify_monitoring_stack.py
+```
+
+The default Grafana password `change-me-local` is only a local-development fallback. Set `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` before starting Compose for any shared environment.
+
+### 9. Monitoring, alerting, and Grafana provisioning
+
+The Docker Compose monitoring path is fully wired:
+
+```text
+FastAPI /metrics
+      ↓ scrape every 10 seconds
+Prometheus + mounted alerts.yml
+      ↓ provisioned datasource UID: prometheus
+Grafana + provisioned dashboard UID: churn-model-performance
+```
+
+Prometheus mounts both [`monitoring/prometheus.yml`](monitoring/prometheus.yml) and [`monitoring/alerts.yml`](monitoring/alerts.yml). The alert rules are:
+
+| Alert | Signal | Current threshold |
+|---|---|---|
+| `APIDown` | API target availability | `up{job="churn-prediction-api"} == 0` for 1 minute |
+| `HighErrorRate` | Error/request ratio | Above 5% for 5 minutes |
+| `HighLatency` | Prediction p95 latency | Above 0.2 seconds for 5 minutes |
+| `LowThroughput` | Prediction rate | Below 1 prediction/second for 10 minutes |
+
+Grafana provisioning is version-controlled and mounted read-only:
+
+- [`monitoring/grafana/provisioning/datasources/prometheus.yml`](monitoring/grafana/provisioning/datasources/prometheus.yml) creates the default Prometheus datasource at `http://prometheus:9090` with stable UID `prometheus`;
+- [`monitoring/grafana/provisioning/dashboards/churn.yml`](monitoring/grafana/provisioning/dashboards/churn.yml) loads dashboards from `/var/lib/grafana/dashboards`; and
+- [`monitoring/grafana/dashboards/model_performance.json`](monitoring/grafana/dashboards/model_performance.json) defines throughput, latency, error-rate, and total-prediction panels.
+
+[`scripts/verify_monitoring_stack.py`](scripts/verify_monitoring_stack.py) performs a real health request and prediction, waits for Prometheus to report the API target as `up`, verifies scraped prediction metrics and all four rules, and queries Grafana for the provisioned datasource and dashboard. The retained [`artifacts/monitoring/stack_verification.json`](artifacts/monitoring/stack_verification.json) records a successful verification with:
+
+- API health HTTP `200` and loaded `baseline_v1.0.0`;
+- real prediction HTTP `200`;
+- Prometheus ready HTTP `200`;
+- API target health `up`;
+- all four expected rules loaded; and
+- Grafana health, datasource, and dashboard API checks returning HTTP `200`.
+
+Alert **evaluation** is implemented. External notifications are intentionally excluded because no Alertmanager receiver, email, Slack, PagerDuty, or other destination and credentials were supplied.
+
+### 10. Data drift and model-health monitoring
+
+Operational health alone cannot prove that model behavior remains valid. [`src/monitoring/drift_detector.py`](src/monitoring/drift_detector.py) therefore provides feature-level statistical monitoring:
+
+| Feature type | Checks | Interpretation |
+|---|---|---|
+| Continuous | Population Stability Index and Kolmogorov–Smirnov test | PSI above `0.2` or KS p-value below `0.05` indicates material distribution change |
+| Categorical | Chi-squared test | p-value below `0.05` indicates changed category distribution |
+
+The local exercise checks `tenure`, `MonthlyCharges`, `TotalCharges`, `Contract`, `PaymentMethod`, and `InternetService`. In real operation, the baseline window should be the approved training distribution and the current window should contain recent production observations. Delayed labels are required to calculate current AUC, recall, and business effectiveness; input drift is an early-warning signal, not a substitute for performance monitoring.
+
+### 11. Retraining decision and lifecycle closure
+
+[`src/retraining/trigger.py`](src/retraining/trigger.py) evaluates four independent signals:
+
+| Signal | Configured trigger |
+|---|---|
+| New labeled data | At least 1,000 new labeled rows |
+| Performance degradation | AUC drop greater than `0.05` from the approved baseline |
+| Feature drift | Maximum drift score greater than `0.3` |
+| Model age | At least 30 days since training |
+
+The output includes every evaluated signal, threshold, observed value, triggered state, and primary reason. It answers **whether retraining is eligible**; it does not automatically train, promote, or deploy a new model. That separation prevents a transient drift signal or bad batch from silently replacing the champion.
+
+When retraining is approved, the lifecycle returns to the raw split and training pipeline, produces a challenger, compares it on validation data, writes a new champion manifest only according to guardrails, runs real saved-artifact tests, and resumes monitoring.
+
+## End-to-end lineage and reproducibility
+
+The project’s lineage is explicit and inspectable without a proprietary metadata platform:
+
+| Lineage stage | Input | Transformation or decision | Persisted output | Downstream consumer |
+|---|---|---|---|---|
+| Source identity | IBM teaching sample | Checksum and rights recording | Dataset provenance record + raw CSV | Ingestion and training |
+| Ingestion | Incoming CSV | Quality gate, merge, deduplicate | Timestamped ingestion JSON + training CSV | Training pipeline |
+| Split | Raw labeled rows | Seeded stratified 60/20/20 split | In-memory train/validation/test partitions | Feature/preprocessing fit |
+| Feature fit | Training rows | Six feature definitions; p75 fit | `feature_threshold.json` | Validation, test, API, batch |
+| Preprocessing fit | Training features | Cleaning, encoding, scaling, feature ordering | `preprocessor.pkl` | Both models and both serving modes |
+| Training | Processed training rows | Baseline and TensorFlow optimization | `.pkl`, `.h5`, metadata, MLflow runs | Evaluation |
+| Evaluation | Validation and untouched test metrics | Absolute gates + baseline comparison | Evaluation JSON/Markdown | Champion selection and CI |
+| Champion | Governed comparison | Promote candidate or keep baseline | `current_best.json` | API, batch, integration tests |
+| Serving | Raw request or CSV | Shared feature/preprocessing path + champion inference | Response or prediction CSV | Retention workflow and monitoring |
+| Monitoring | API metrics and current feature windows | Alerts, dashboard queries, PSI/KS/chi-square | Stack verification and drift reports | Operations and retraining trigger |
+| Retraining decision | Labeled volume, AUC, drift, model age | Four-signal policy | Decision log | Human or CI training initiation |
+
+Reproducibility controls include a fixed seed (`42`), pinned runtime versions, raw-data checksum, train-only fitting, saved preprocessing state, saved model versions, MLflow run history, machine-readable evaluation reports, an explicit champion manifest, a dedicated Docker serving dependency set, and executable tests around the real serving bundle.
+
+## CI validation flow
+
+The root workflow [`.github/workflows/enterprise-mlops-churn-ci.yml`](../../.github/workflows/enterprise-mlops-churn-ci.yml) is scoped to this project and implements:
+
+```text
+Data quality
+    ↓
+100 unit tests + coverage
+    ↓
+Train baseline and TensorFlow candidate
+    ↓
+Apply promotion guardrails
+    ├── PROMOTE CANDIDATE ─┐
+    └── KEEP BASELINE ─────┤ both are governed outcomes
+                           ↓
+4 real saved-artifact API integration tests
+    ↓
+Docker build and API smoke test
+    ↓
+Release-readiness summary (no external deployment)
+```
+
+The workflow uploads quality, coverage, training, serving, and evaluation artifacts between jobs. It verifies that the comparison decision, process exit status, champion type, and selected model path agree. It references the four existing integration tests rather than a missing placeholder suite.
+
+**Verification boundary:** all tests and Docker/monitoring checks described below were executed locally. A successful GitHub-hosted Actions run URL has not yet been retained, so hosted CI execution must not be represented as verified. The Linux CI dependency installation must also succeed with the TensorFlow 2.13 compatibility constraints before release readiness is claimed.
+
+## Verification evidence
+
+### Tests
+
+[`artifacts/test_summary.json`](artifacts/test_summary.json) records:
+
+| Test group | Passed | Failed |
 |---|---:|---:|
-| Validation accuracy | 0.7488 | 0.7353 |
-| Validation precision | 0.5174 | 0.5009 |
-| Validation recall | 0.7941 | 0.7674 |
-| Validation F1 | 0.6266 | 0.6061 |
-| Validation AUC | 0.8354 | 0.8300 |
-| Final test recall | 0.7807 | 0.7914 |
-| Final test AUC | 0.8429 | 0.8364 |
+| Unit | 100 | 0 |
+| Saved-artifact integration | 4 | 0 |
+| **Total** | **104** | **0** |
 
-The candidate passes the absolute AUC and recall thresholds but fails the required non-negative AUC gain. `models/current_best.json` therefore selects `baseline_v1.0.0` and records the `-0.0054` validation-AUC difference.
+Source coverage is **69%**. The integration suite starts the real FastAPI lifespan and verifies:
 
-## Execution verification
+1. every champion-serving artifact exists;
+2. `/health` reports the loaded champion;
+3. `/predict` executes with the real preprocessor and champion model; and
+4. `/metrics` exposes prediction observability.
 
-The existing project-local virtual environment was reused; no new neural-network framework or replacement environment was installed.
-
-### Fresh test result
+Run the same checks:
 
 ```bash
-./venv/bin/python -m pytest tests/unit -q \
-  --cov=src \
-  --cov-report=term \
-  --cov-report=xml
+python -m pytest tests/unit -q --cov=src --cov-report=term --cov-report=xml
+python -m pytest tests/integration -q
 ```
 
-```text
-96 passed
-0 failed
-69% source coverage
-```
-
-Saved-artifact integration verification:
-
-```bash
-./venv/bin/python -m pytest tests/integration -q
-```
-
-```text
-4 passed
-```
-
-The integration suite starts the FastAPI lifespan with the real champion, preprocessor, and feature threshold, then verifies `/health`, `/predict`, and `/metrics` without mocks.
-
-### FastAPI verification
-
-```text
-GET  /health   -> HTTP 200, model_loaded=true, baseline_v1.0.0
-POST /predict  -> HTTP 200, probability=0.760917, Yes, High
-GET  /metrics  -> HTTP 200, Prometheus metrics present
-```
-
-### MLflow verification
-
-Experiment `churn-prediction` contains two finished runs:
-
-```text
-baseline_20260808_041203   FINISHED
-candidate_20260808_041229  FINISHED
-```
-
-### Performance evidence
+### Measured local performance
 
 | Measurement | Result |
 |---|---:|
@@ -247,56 +390,72 @@ candidate_20260808_041229  FINISHED
 | Sequential average | 9.56 ms |
 | Sequential p95 | 10.21 ms |
 | Sequential p99 | 18.79 ms |
-| Concurrent requests | 100/100 successful, concurrency 10 |
+| Concurrent requests | 100/100 successful at concurrency 10 |
 | Concurrent p95 | 89.01 ms |
 | Concurrent throughput | 126.29 requests/second |
 | Batch scoring | 7,043 rows in approximately 0.25 seconds |
 
-These are localhost functional measurements, not a cloud-capacity guarantee.
+These are local functional measurements retained in [`artifacts/benchmark_results.json`](artifacts/benchmark_results.json), not a cloud capacity or service-level guarantee.
 
 ## Reproducible runbook
 
-Run from the project root. Reuse the verified environment when available.
+Run commands from the project root.
+
+### Start the saved champion immediately
 
 ```bash
 source venv/bin/activate
+uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
+```
 
+Test it:
+
+```bash
+curl --fail http://127.0.0.1:8000/health
+
+curl --fail -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  --data @sample_request.json
+```
+
+### Rebuild the full training bundle
+
+```bash
 python -m src.data.quality
-
 python -m src.training.train --model baseline
 python -m src.training.train --model candidate
 python -m src.training.evaluate
+```
 
-uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
+For the retained metrics, evaluation selects the baseline. A candidate-rejection exit outcome is expected and should be interpreted together with the generated comparison and champion files.
 
+### Run batch scoring
+
+```bash
+python -m src.serving.batch_predict \
+  --input data/raw/telco_customer_churn.csv \
+  --output artifacts/predictions/batch_predictions.csv \
+  --chunk-size 1000
+```
+
+### Benchmark the API
+
+```bash
 python scripts/benchmark_latency.py \
   --url http://127.0.0.1:8000 \
   --requests 100 \
   --concurrency 10 \
   --output artifacts/benchmark_results.json
+```
 
-python -m src.serving.batch_predict \
-  --input data/raw/telco_customer_churn.csv \
-  --output artifacts/predictions/batch_predictions.csv \
-  --chunk-size 1000
+### Run drift and retraining checks
 
+```bash
 python -m src.monitoring.drift_detector
 python -m src.retraining.trigger
 ```
 
-`src.training.evaluate` intentionally returns a non-zero status when the candidate is rejected. For the current results, this is a correct guardrail decision, not a training failure.
-
-### Start and test FastAPI
-
-```bash
-uvicorn src.serving.api:app --host 127.0.0.1 --port 8000
-
-curl -X POST "http://127.0.0.1:8000/predict" \
-  -H "Content-Type: application/json" \
-  --data @sample_request.json
-```
-
-### Start MLflow UI
+### Start MLflow
 
 ```bash
 mlflow ui \
@@ -305,124 +464,96 @@ mlflow ui \
   --port 5000
 ```
 
-## Access URLs and evidence status
+## Local service endpoints
 
-| Component | Local URL | Evidence status |
+| Component | URL | Verified state |
 |---|---|---|
-| FastAPI | `http://127.0.0.1:8000` | Executed and verified |
-| Swagger documentation | `http://127.0.0.1:8000/docs` | Available while API runs |
-| Health | `http://127.0.0.1:8000/health` | Verified |
-| Prediction | `POST http://127.0.0.1:8000/predict` | Verified |
-| API observability | `http://127.0.0.1:8000/metrics` | Verified |
-| MLflow | `http://127.0.0.1:5000` | Backend/runs verified; UI starts on demand |
-| Streamlit | `http://127.0.0.1:8501` | Prototype, not execution-verified |
-| Prometheus | `http://127.0.0.1:9090` | Locally verified: API target up and four mounted rules loaded |
-| Grafana | `http://127.0.0.1:3000` | Locally verified: Prometheus datasource and churn dashboard provisioned |
+| FastAPI | `http://127.0.0.1:8000` | Saved champion loaded and prediction executed |
+| Swagger/OpenAPI | `http://127.0.0.1:8000/docs` | Available while API runs |
+| Health | `http://127.0.0.1:8000/health` | HTTP 200 verified |
+| Metrics | `http://127.0.0.1:8000/metrics` | Prometheus metrics scraped |
+| MLflow | `http://127.0.0.1:5000` | Backend and two finished runs verified; UI starts on demand |
+| Prometheus | `http://127.0.0.1:9090` | Target `up`; four rules loaded |
+| Grafana | `http://127.0.0.1:3000` | Datasource and dashboard provisioned |
+| Streamlit prototype | `http://127.0.0.1:8501` | Optional and outside the verified Compose path |
 
-## Online and offline triggers
+## Course concept alignment: Week 1 through Week 11
 
-| Mode | Trigger | Implemented behavior | Automation boundary |
-|---|---|---|---|
-| Online inference | `POST /predict` | Shared feature calculation, fitted preprocessing, champion prediction, risk/version response, metrics update | Synchronous and verified |
-| Offline batch scoring | `python -m src.serving.batch_predict ...` | Chunked scoring to campaign CSV | Executed; external scheduling not included |
-| Offline ingestion | `python -m src.data.ingestion ...` | Validate, merge, deduplicate and log incoming CSV | Executed; retained audit log records a successful 7,043-row reproducibility replay |
-| Offline monitoring | `python -m src.monitoring.drift_detector` | PSI, KS and chi-squared report | Executed on simulated baseline/current split |
-| Retraining eligibility | `python -m src.retraining.trigger` | Check label count, AUC drop, drift and model age | Logs decision; does not start training |
-| Actual retraining | Human or CI invokes train/evaluate | Train both versions, compare validation, update champion | Weekly cron is policy configuration only |
+The implementation uses only the Week 1–11 concepts that are appropriate to this churn problem; it does not add streaming infrastructure, a distributed feature store, or automated rollout machinery without a demonstrated need.
 
-## Code responsibilities and interactions
-
-| File/group | Responsibility | Main interaction |
+| Course material | Applied project concept | Concrete implementation |
 |---|---|---|
-| `src/data/ingestion.py` | Incoming CSV validation, merge, deduplication and audit log | Calls the quality checker and creates training data |
-| `src/data/quality.py` | Schema, missingness, range, duplicate and consistency checks | Used standalone and by ingestion |
-| `src/data/preprocessing.py` | Cleaning, raw split, fitted encoding/scaling and feature ordering | Shared by training, API and batch paths |
-| `src/features/engineering.py` | Six shared business features and persisted percentile threshold | Offline fit; online reuse |
-| `src/models/baseline.py` | Balanced Logistic Regression | Trained offline; loaded when champion |
-| `src/models/candidate.py` | TensorFlow neural network | Trained offline; loaded only if promoted |
-| `src/models/explainer.py` | Optional SHAP/LIME adapter | Used by optional `/explain` endpoint |
-| `src/training/train.py` | Split, feature/preprocessing fit, train, evaluate, save, MLflow log | Coordinates model-development pipeline |
-| `src/training/evaluate.py` | Validation comparison and promotion guardrails | Writes reports and `current_best.json` |
-| `src/serving/api.py` | Online API, validation, champion loading and metrics | Loads shared artifacts and selected model |
-| `src/serving/batch_predict.py` | Chunked offline scoring | Uses the same artifacts and champion as API |
-| `src/monitoring/drift_detector.py` | PSI, KS and chi-squared drift checks | Produces JSON drift evidence |
-| `src/retraining/trigger.py` | Four-signal retraining eligibility | Produces decision logs; no auto-training |
-| `scripts/benchmark_latency.py` | Sequential/concurrent API load test | Produces benchmark JSON |
-| `scripts/build_submission_pdf.py` | Reproducible six-page report generation | Reads retained evidence artifacts |
-| `tests/unit/*.py` | 100 unit tests over core and monitoring contracts | Produces coverage evidence |
+| **Week 1 — Model engineering lifecycle** | Move from experiment to a reliable, versioned prediction system | Saved models, MLflow, serving, monitoring, and retraining decision loop |
+| **Week 2 — Inference patterns** | Select online inference for agent interactions and batch inference for campaigns | FastAPI `/predict`, chunked CSV scorer, latency and throughput evidence |
+| **Week 3 — Serving and containerization** | Load once, validate input, expose health/metrics, package a stable runtime | FastAPI contract, Dockerfile, Compose network, container health checks |
+| **Week 4 — ML CI/CD, artifacts, lineage** | Treat data, preprocessing, models, metrics, and code as one governed release bundle | Data-quality job, artifact hand-offs, MLflow runs, comparison reports, champion manifest, Git-retained serving artifacts |
+| **Week 5 — Monitoring and observability** | Monitor system health and model-input health separately | Prometheus metrics/rules, Grafana dashboard, PSI, KS, and chi-squared checks |
+| **Week 6 — Continuous training and governance** | Retrain from evidence; compare challenger with champion; allow safe baseline retention | Four retraining signals, validation guardrails, CI handling for both promotion outcomes |
+| **Week 7 — Runtime optimization considerations** | Measure rather than assume serving performance; keep runtime dependencies scoped | Local p95/p99/throughput benchmark and API-only requirements file; no unnecessary model-format conversion |
+| **Week 8 — Production trade-offs** | Balance model complexity, accuracy, latency, and maintainability | Simpler baseline retained because the neural candidate did not improve validation AUC |
+| **Week 9 — Feature consistency** | Define features once and reuse them in training and serving | Shared feature module, persisted train-only threshold and preprocessor; a full feature store is unnecessary for one small static dataset |
+| **Week 10 — Reliable data pipelines** | Replace notebook-only ingestion with a repeatable, quality-gated batch path | CSV ingestion, merge, deduplication, blocking checks, non-blocking warning, timestamped audit log |
+| **Week 11 — Security, privacy, and responsible use** | Minimize identifier use, validate inputs, preserve provenance, and keep humans in the decision loop | `customerID` excluded from modeling, Pydantic validation, no secrets in Git, rights disclosure, human-reviewed retention action |
 
-## Project structure
+## Repository structure and artifact policy
 
 ```text
 enterprise-mlops-churn-prediction/
-├── config/                    # Model, serving, monitoring and feature policy
-├── data/raw/                  # Source dataset
+├── config/                         # Data, model, serving, monitoring, and feature policy
+├── data/raw/                       # Checksum-identified source dataset
 ├── src/
-│   ├── data/                  # Ingestion, quality and preprocessing
-│   ├── features/              # Shared feature engineering
-│   ├── models/                # Baseline, TensorFlow candidate and explainer
-│   ├── training/              # Training, comparison and promotion
-│   ├── serving/               # FastAPI and batch inference
-│   ├── monitoring/            # Drift detection
-│   └── retraining/            # Eligibility logic
-├── tests/unit/                # 96 verified tests
-├── artifacts/                 # Reports, logs, benchmarks and predictions
-├── models/                    # Saved models and champion manifest
-├── mlruns/ and mlflow.db      # Experiment tracking evidence
-├── monitoring/                # Verified Prometheus/Grafana configs and provisioning
-├── docker/                    # Clean-built API and locally verified monitoring stack
-├── webapp/                    # Optional Streamlit prototype
-├── scripts/                   # Benchmark and PDF builder
-├── docs/                      # Design, architecture and alignment audit
-└── output/pdf/                # Consolidated submission
+│   ├── data/                       # Ingestion, quality checks, preprocessing
+│   ├── features/                   # Shared offline/online feature definitions
+│   ├── models/                     # Baseline, TensorFlow candidate, optional explainer
+│   ├── training/                   # Train, evaluate, compare, select champion
+│   ├── serving/                    # FastAPI and batch inference
+│   ├── monitoring/                 # Statistical drift detection
+│   └── retraining/                 # Four-signal retraining eligibility
+├── models/                         # Git-retained baseline, candidate, metadata, champion manifest
+├── artifacts/
+│   ├── eval/                       # Git-retained metrics and promotion decision
+│   ├── logs/                       # Representative Git-retained ingestion audit
+│   ├── monitoring/                 # Git-retained monitoring-stack verification
+│   ├── preprocessor.pkl            # Git-retained fitted transformation state
+│   └── feature_threshold.json      # Git-retained train-only statistic
+├── monitoring/                     # Prometheus rules and Grafana provisioning
+├── docker/                         # API image and multi-service Compose stack
+├── tests/unit/                     # 100 unit tests
+├── tests/integration/              # 4 real saved-artifact API tests
+├── scripts/                        # Benchmark, monitoring verifier, report builder
+├── webapp/                         # Optional Streamlit prototype
+├── docs/                           # Architecture, design, provenance, alignment
+├── mlflow.db                       # Retained local experiment metadata
+└── output/pdf/                     # Consolidated submission report
 ```
 
-## Optional deployment prototypes
+The `.gitignore` still excludes bulk/generated training data, prediction outputs, transient logs, drift replays, caches, and arbitrary model files. Narrow exceptions include only the specific serving models, preprocessor, feature threshold, evaluation reports, ingestion evidence, monitoring verification, and submission artifacts needed for review and fresh-clone operation.
 
-### Docker Compose
+## Known boundaries and next production steps
 
-```bash
-docker compose -f docker/docker-compose.yml up --build
-```
+This is a verified mini-production system, not a claim of a fully managed cloud platform. The remaining technical boundaries are explicit:
 
-The current Compose file defines API, MLflow, Prometheus, and Grafana. The API/Prometheus/Grafana subset was clean-built and locally verified on 08 August 2026; `artifacts/monitoring/stack_verification.json` retains the result. The MLflow Compose service and external notification delivery were not part of that verification, and Compose does not define Streamlit.
+1. **Hosted CI:** retain a successful GitHub Actions run and resolve any Linux TensorFlow dependency constraints surfaced by the hosted runner.
+2. **Notifications:** add Alertmanager and a credential-managed receiver only when a real notification destination is selected.
+3. **Authentication and network controls:** replace permissive development CORS and protect API, Prometheus, Grafana, and MLflow before shared or internet-facing deployment.
+4. **Delayed-label monitoring:** automate recent AUC, recall, calibration, and campaign-outcome collection once production labels exist.
+5. **Feature evolution:** replace simple category mappings with an explicit unknown-category policy before accepting unconstrained production categories.
+6. **Scheduling:** attach ingestion, drift checks, and approved retraining to an orchestrator only when operational ownership and rollback procedures exist.
+7. **Scale validation:** rerun load, failure, and recovery tests in the target infrastructure; local benchmarks do not establish a production SLA.
 
-### Streamlit
+## Retained evidence index
 
-```bash
-streamlit run webapp/app.py \
-  --server.address 127.0.0.1 \
-  --server.port 8501
-```
-
-## Necessary improvements
-
-1. Add an Alertmanager destination only if external alert delivery is required.
-2. Align Compose and documentation if Streamlit should be part of the container stack.
-3. Run the implemented CI workflow on GitHub-hosted infrastructure and retain the successful run URL.
-4. Automate delayed-label AUC/recall and campaign-ROI collection.
-5. Replace arbitrary integer mappings for nominal features with a fitted one-hot or another unknown-safe encoder.
-6. Add external scheduling only if automated retraining is required.
-
-## Documentation and retained evidence
-
-- [Final submission PDF](output/pdf/enterprise_mlops_churn_submission.pdf)
-- [Assignment alignment and workflow](docs/assignment_alignment_and_workflow.md)
-- [Design document](docs/design_document.md)
 - [Architecture diagram](docs/architecture_diagram.svg)
-- `artifacts/eval/`: validation/test metrics and promotion decision
-- `artifacts/benchmark_results.json`: latency and throughput
-- `artifacts/predictions/batch_predictions.csv`: complete batch output
-- `artifacts/drift_reports/`: executed drift evidence
-- `artifacts/logs/`: quality and retraining-decision logs
-- `models/current_best.json`: champion and guardrail reason
-- `mlflow.db` and `mlruns/`: two finished tracked runs
-- `coverage.xml` and `artifacts/test_summary.json`: test evidence
-
-## Academic-use note
-
-This is an academic mini-production prototype for the BITS Pilani MSc program. It is not represented as a fully deployed cloud production system.
-
-**Last updated:** August 2026
-**Version:** 2.0.0
-**Status:** Core assignment verified; optional production extensions remain prototypes
+- [Dataset provenance and license record](docs/dataset_provenance_and_license.md)
+- [Representative ingestion audit](artifacts/logs/ingestion_20260808_082509.json)
+- [Baseline evaluation](artifacts/eval/baseline_evaluation.json)
+- [TensorFlow candidate evaluation](artifacts/eval/candidate_evaluation.json)
+- [Model comparison and promotion decision](artifacts/eval/model_comparison.md)
+- [Champion manifest](models/current_best.json)
+- [API verification response](artifacts/api_response.json)
+- [Latency and throughput benchmark](artifacts/benchmark_results.json)
+- [Monitoring-stack verification](artifacts/monitoring/stack_verification.json)
+- [Test summary](artifacts/test_summary.json)
+- [Final submission PDF](output/pdf/enterprise_mlops_churn_submission.pdf)
+- [Detailed design](docs/design_document.md)
+- [Assignment alignment and workflow](docs/assignment_alignment_and_workflow.md)
