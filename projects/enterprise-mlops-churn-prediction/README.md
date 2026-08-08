@@ -42,11 +42,17 @@ The current champion is **`baseline_v1.0.0`**. The TensorFlow candidate met the 
 | GitHub Actions lifecycle workflow | **Implemented; hosted run pending** | [`.github/workflows/enterprise-mlops-churn-ci.yml`](../../.github/workflows/enterprise-mlops-churn-ci.yml) |
 | Automated production deployment or retraining | **Outside current scope** | CI validates readiness; a human or CI invocation starts training and no external environment is mutated automatically |
 
-## Architecture
+## End-to-end architecture and user/system workflow
+
+![Detailed enterprise churn workflow connecting data sources, ingestion, quality controls, shared features, model training and governance, online and batch inference, users, monitoring, alerts, and retraining](docs/mermaid-diagram.png)
+
+The detailed workflow shows how internal and external actors interact with the implemented system. CRM batches pass through ingestion and quality controls; shared feature and preprocessing artifacts feed governed training as well as online and batch inference; customer-service agents and marketing analysts consume predictions; and delayed labels, operational metrics, and drift signals close the monitoring and retraining-decision loop.
+
+### Governed ML lifecycle summary
 
 ![Enterprise Telco Churn ML lifecycle: Data Sources to Pipelines, Features, Training, optional Model Registry, Serving, Monitoring, and Retraining](docs/architecture_diagram.svg)
 
-The diagram shows the primary lifecycle. The implementation uses a deliberately small production architecture:
+The lifecycle summary condenses the same implementation into eight review stages:
 
 - **Data Sources:** the identified IBM teaching dataset represents a CRM/customer snapshot; future labeled batches can enter through the same ingestion interface.
 - **Pipelines:** incoming CSV data is schema-checked, quality-checked, merged, deduplicated by `customerID`, and logged before it can become training input.
@@ -555,7 +561,8 @@ This is a verified mini-production system, not a claim of a fully managed cloud 
 
 ## Retained evidence index
 
-- [Architecture diagram](docs/architecture_diagram.svg)
+- [Detailed end-to-end user/system workflow](docs/mermaid-diagram.png)
+- [Governed ML lifecycle summary](docs/architecture_diagram.svg)
 - [Dataset provenance and license record](docs/dataset_provenance_and_license.md)
 - [Representative ingestion audit](artifacts/logs/ingestion_20260808_082509.json)
 - [Baseline evaluation](artifacts/eval/baseline_evaluation.json)
